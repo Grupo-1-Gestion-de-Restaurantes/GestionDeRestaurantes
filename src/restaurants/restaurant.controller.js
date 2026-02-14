@@ -2,7 +2,11 @@ import Restaurante from "../restaurants/restaurant.model.js";
 
 export const createRestaurante = async (req, res) => {
   try {
+    console.log("BODY QUE LLEGA:", req.body);
+    
     const data = req.body;
+
+
 
     const restaurante = new Restaurante(data);
     await restaurante.save();

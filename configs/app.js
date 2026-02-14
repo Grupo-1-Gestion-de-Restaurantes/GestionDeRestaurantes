@@ -5,9 +5,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { dbConnection } from './db.js';
-import restaurantRoutes from '../src/restaurant.routes.js';
+import restaurantRoutes from '../src/restaurants/restaurant.routes.js';
 
-const BASE_PATH = '/kinalSportsAdmin/v1';
+const BASE_PATH = '/gestionDeRestaurantes/v1';
 
 const middlewares = (app) => {
     app.use(express.json());

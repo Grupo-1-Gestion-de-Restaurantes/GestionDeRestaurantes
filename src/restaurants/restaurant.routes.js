@@ -5,13 +5,13 @@ import {
   getRestauranteById,
   updateRestaurante,
   deleteRestaurante
-} from "./restaurants/restaurant.controller.js";
+} from "./restaurant.controller.js";
 
 const router = Router();
 
-router.post("/", createRestaurante);
+router.post("/create", createRestaurante);
 
-router.get("/", getRestaurantes);
+router.get("/get", getRestaurantes);
 
 router.get("/:id", getRestauranteById);
 

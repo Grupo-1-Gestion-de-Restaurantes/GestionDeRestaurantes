@@ -28,15 +28,19 @@ const restaurantSchema = new Schema(
       maxlength: [500, "La descripción no puede superar los 500 caracteres"]
     },
 
-    
+
     openingTime: {
-      type: Time,
-      required: true
+      type: String,
+      required: [true, "La hora de apertura es obligatoria"],
+      trim: true,
+      match: [/^([01]\d|2[0-3]):([0-5]\d)$/, "Usa el formato HH:mm (ej: 09:30)"]
     },
 
     closingTime: {
-      type: Time,
-      required: true
+      type: String,
+      required: [true, "La hora de cierre es obligatoria"],
+      trim: true,
+      match: [/^([01]\d|2[0-3]):([0-5]\d)$/, "Usa el formato HH:mm (ej: 22:00)"]
     },
 
     averagePrice: {
@@ -59,7 +63,6 @@ const restaurantSchema = new Schema(
       type: String,
       enum: ["Abierto", "Cerrado", "En Mantenimiento"],
       default: "Abierto",
-      required: true
     },
 
     asset: {
@@ -79,4 +82,4 @@ const restaurantSchema = new Schema(
   }
 );
 
-export default model("Restaurante", restauranteSchema);
+export default model("Restaurante", restaurantSchema);
