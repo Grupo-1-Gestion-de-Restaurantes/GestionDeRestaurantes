@@ -5,7 +5,7 @@ import {
   getRestauranteById,
   updateRestaurante,
   deleteRestaurante
-} from "../restaurants/restaurant.controller.js";
+} from "./restaurants/restaurant.controller.js";
 
 const router = Router();
 
