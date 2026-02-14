@@ -1,0 +1,82 @@
+import { Schema, model } from "mongoose";
+
+const restaurantSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "El nombre es obligatorio"],
+      trim: true,
+      minlength: [3, "El nombre debe tener al menos 3 caracteres"],
+      maxlength: [100, "El nombre no puede superar los 100 caracteres"]
+    },
+
+    address: {
+      type: String,
+      required: [true, "La dirección es obligatoria"],
+      trim: true
+    },
+
+    categories: {
+      type: String,
+      required: true,
+      enum: ["Gourmet", "Casual"]
+    },
+
+    description: {
+      type: String,
+      trim: true,
+      maxlength: [500, "La descripción no puede superar los 500 caracteres"]
+    },
+
+    
+    openingTime: {
+      type: Time,
+      required: true
+    },
+
+    closingTime: {
+      type: Time,
+      required: true
+    },
+
+    averagePrice: {
+      type: Number,
+      min: [0, "El precio promedio no puede ser negativo"]
+    },
+
+    phone: {
+      type: String,
+      required: [true, "El teléfono es obligatorio"],
+      match: [/^[0-9]{8,15}$/, "Ingrese un número de teléfono válido"]
+    },
+
+    photo: {
+      type: String,
+      default: null
+    },
+
+    status: {
+      type: String,
+      enum: ["Abierto", "Cerrado", "En Mantenimiento"],
+      default: "Abierto",
+      required: true
+    },
+
+    asset: {
+      type: Boolean,
+      default: true
+    },
+
+    rating: {
+      type: Number,
+      min: [1, "El rating mínimo es 1"],
+      max: [5, "El rating máximo es 5"],
+      default: 5
+    }
+  },
+  {
+    timestamps: true
+  }
+);
+
+export default model("Restaurante", restauranteSchema);
