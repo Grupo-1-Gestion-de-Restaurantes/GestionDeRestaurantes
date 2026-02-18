@@ -1,22 +1,34 @@
 import { Router } from "express";
+import { validateJWT } from "../../middlewares/validate-JWT.js"
+import { uploadFieldImage } from '../../middlewares/file-uploader.js';
+import { cleanUploaderFileOnFinish } from '../../middlewares/delete-file-on-error.js';
+import { validateCreateRestaurant, validateRestaurantStatusChange, validateGetRestaurantdById, validateUpdateRetaurantRequest } from '../../middlewares/restaurant-validators.js';
 import {
   createRestaurante,
   getRestaurantes,
   getRestauranteById,
   updateRestaurante,
-  deleteRestaurante
+  changeRestauranteStatus
 } from "./restaurant.controller.js";
 
 const router = Router();
 
-router.post("/create", createRestaurante);
+router.post("/create",
+  uploadFieldImage.single('image'),
+  cleanUploaderFileOnFinish, 
+  validateCreateRestaurant,
+  createRestaurante);
 
 router.get("/get", getRestaurantes);
 
 router.get("/:id", getRestauranteById);
 
-router.put("/:id", updateRestaurante);
+router.put("/:id", 
+  uploadFieldImage.single('image'),
+  cleanUploaderFileOnFinish,
+  validateUpdateRetaurantRequest,
+  updateRestaurante);
 
-router.delete("/:id", deleteRestaurante);
+router.delete("/:id", changeRestauranteStatus);
 
 export default router;

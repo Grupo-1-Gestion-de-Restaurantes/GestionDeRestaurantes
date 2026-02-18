@@ -1,6 +1,8 @@
-import { Schema, model } from "mongoose";
+'use strict';
 
-const restaurantSchema = new Schema(
+import mongoose from "mongoose";
+
+const restaurantSchema = mongoose.Schema(
   {
     name: {
       type: String,
@@ -78,8 +80,9 @@ const restaurantSchema = new Schema(
     }
   },
   {
-    timestamps: true
+    timestamps: true,
+    versionKey: false
   }
 );
 
-export default model("Restaurante", restaurantSchema);
+export default mongoose.model("Restaurante", restaurantSchema);
