@@ -3,22 +3,24 @@ import Restaurante from "../restaurants/restaurant.model.js";
 export const createRestaurante = async (req, res) => {
   try {
     console.log("BODY QUE LLEGA:", req.body);
-    
-    const data = req.body;
 
+    const restaurantData = req.body;
 
+    if (req.file) {
+      restaurantData.photo = req.file.path;
+    }
 
-    const restaurante = new Restaurante(data);
+    const restaurante = new Restaurante(restaurantData);
     await restaurante.save();
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       message: "Restaurante creado correctamente",
-      restaurante
+      data: restaurante
     });
 
   } catch (error) {
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: "Error al crear restaurante",
       error: error.message
@@ -28,20 +30,40 @@ export const createRestaurante = async (req, res) => {
 
 export const getRestaurantes = async (req, res) => {
   try {
-    const restaurantes = await Restaurante.find({ activo: true });
+    const { page = 1, limit = 10, asset = true } = req.query;
 
-    return res.json({
+    const filter = { asset };
+
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort: { createdAt: -1 }
+    }
+
+    const restaurantes = await Restaurante.find(filter)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort(options.sort);
+
+    const total = await Restaurante.countDocuments(filter);
+
+    res.status(200).json({
       success: true,
-      total: restaurantes.length,
-      restaurantes
-    });
-
+      data: restaurantes,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalRecords: total,
+        limit,
+        restaurantes
+      }
+    })
   } catch (error) {
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      message: "Error al obtener restaurantes",
+      message: 'Error al obtener los restaurantes',
       error: error.message
-    });
+    })
   }
 };
 
@@ -51,23 +73,22 @@ export const getRestauranteById = async (req, res) => {
 
     const restaurante = await Restaurante.findById(id);
 
-    if (!restaurante || !restaurante.activo) {
+    if (!restaurante) {
       return res.status(404).json({
         success: false,
-        message: "Restaurante no encontrado"
+        message: 'restaurante no encontrado',
       });
     }
 
-    return res.json({
+    res.status(200).json({
       success: true,
-      restaurante
+      data: restaurante,
     });
-
   } catch (error) {
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      message: "Error al buscar restaurante",
-      error: error.message
+      message: 'Error al obtener el restaurante',
+      error: error.message,
     });
   }
 };
@@ -75,63 +96,75 @@ export const getRestauranteById = async (req, res) => {
 export const updateRestaurante = async (req, res) => {
   try {
     const { id } = req.params;
-    const data = req.body;
 
-    const restaurante = await Restaurante.findByIdAndUpdate(
-      id,
-      data,
-      { new: true }
-    );
-
-    if (!restaurante) {
+    const currentRestaurante = await Restaurante.findById(id);
+    if (!currentRestaurante) {
       return res.status(404).json({
         success: false,
-        message: "Restaurante no encontrado"
+        message: "Restaurante no encontrado",
       });
     }
 
-    return res.json({
-      success: true,
-      message: "Restaurante actualizado correctamente",
-      restaurante
+    const updateData = { ...req.body };
+
+    if (req.file) {
+      if (currentRestaurante.photo_public_id) {
+        await cloudinary.uploader.destroy(currentRestaurante.photo_public_id);
+      }
+
+      updateData.photo = req.file.path;
+      updateData.photo_public_id = req.file.filename;
+    }
+
+    const updatedRestaurante = await Restaurante.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
     });
 
+    res.status(200).json({
+      success: true,
+      message: "Restaurante actualizado exitosamente",
+      data: updatedRestaurante,
+    });
   } catch (error) {
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: "Error al actualizar restaurante",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
-export const deleteRestaurante = async (req, res) => {
+export const changeRestauranteStatus = async (req, res) => {
   try {
-    const { id } = req.params;
+        const { id } = req.params;
+        // Detectar si es activate o deactivate desde la URL
+        const asset = req.url.includes('/activate');
+        const action = asset ? 'activado' : 'desactivado';
 
-    const restaurante = await Restaurante.findByIdAndUpdate(
-      id,
-      { activo: false },
-      { new: true }
-    );
+        const restaurante = await Restaurante.findByIdAndUpdate(
+            id,
+            { asset },
+            { new: true }
+        );
 
-    if (!restaurante) {
-      return res.status(404).json({
-        success: false,
-        message: "Restaurante no encontrado"
-      });
+        if (!restaurante) {
+            return res.status(404).json({
+                success: false,
+                message: 'Restaurante no encontrado',
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Restaurante ${action} exitosamente`,
+            data: restaurante,
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al cambiar el estado del restaurante',
+            error: error.message,
+        });
     }
-
-    return res.json({
-      success: true,
-      message: "Restaurante eliminado (soft delete)"
-    });
-
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error al eliminar restaurante",
-      error: error.message
-    });
-  }
 };
