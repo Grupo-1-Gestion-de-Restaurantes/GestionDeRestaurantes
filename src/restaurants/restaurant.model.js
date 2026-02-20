@@ -67,7 +67,7 @@ const restaurantSchema = mongoose.Schema(
       default: "Abierto",
     },
 
-    asset: {
+    isActive: {
       type: Boolean,
       default: true
     },

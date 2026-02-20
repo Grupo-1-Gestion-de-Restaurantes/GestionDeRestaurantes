@@ -1,7 +1,9 @@
 import Table from './table.model.js';
+import Restaurant from '../restaurants/restaurant.model.js';
 
 export const createTable = async (req, res) => {
     try {
+        console.log("BODY QUE LLEGA:", req.body);
         const tableData = req.body;
 
         const table = new Table(tableData);
@@ -24,9 +26,9 @@ export const createTable = async (req, res) => {
 
 export const getTables = async (req, res) => {
     try {
-        const { page = 1, limit = 10, activo = true, restaurante } = req.query;
+        const { page = 1, limit = 10, isActive = true, restaurante } = req.query;
 
-        const filter = { activo };
+        const filter = { isActive };
         
         if (restaurante) {
             filter.restaurante = restaurante;
@@ -39,7 +41,7 @@ export const getTables = async (req, res) => {
         };
 
         const tables = await Table.find(filter)
-            .populate('restaurante', 'nombre')
+            .populate('restaurant', 'name')
             .limit(limit * 1)
             .skip((page - 1) * limit)
             .sort(options.sort);
@@ -69,7 +71,7 @@ export const getTableById = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const table = await Table.findById(id).populate('restaurante', 'nombre');
+        const table = await Table.findById(id).populate('restaurant', 'name');
 
         if (!table) {
             return res.status(404).json({
@@ -127,12 +129,12 @@ export const updateTable = async (req, res) => {
 export const changeTableStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const activo = req.url.includes('/activate');
-        const action = activo ? 'activada' : 'desactivada';
+        const isActive = req.url.includes('/activate');
+        const action = isActive ? 'activada' : 'desactivada';
 
         const table = await Table.findByIdAndUpdate(
             id,
-            { activo },
+            { isActive },
             { new: true }
         );
 

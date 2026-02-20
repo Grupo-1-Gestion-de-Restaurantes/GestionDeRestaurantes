@@ -30,9 +30,9 @@ export const createRestaurante = async (req, res) => {
 
 export const getRestaurantes = async (req, res) => {
   try {
-    const { page = 1, limit = 10, asset = true } = req.query;
+    const { page = 1, limit = 10, isActive = true } = req.query;
 
-    const filter = { asset };
+    const filter = { isActive };
 
     const options = {
       page: parseInt(page),
@@ -137,34 +137,34 @@ export const updateRestaurante = async (req, res) => {
 
 export const changeRestauranteStatus = async (req, res) => {
   try {
-        const { id } = req.params;
-        // Detectar si es activate o deactivate desde la URL
-        const asset = req.url.includes('/activate');
-        const action = asset ? 'activado' : 'desactivado';
+    const { id } = req.params;
+    // Detectar si es activate o deactivate desde la URL
+    const isActive = req.url.includes('/activate');
+    const action = isActive ? 'activado' : 'desactivado';
 
-        const restaurante = await Restaurante.findByIdAndUpdate(
-            id,
-            { asset },
-            { new: true }
-        );
+    const restaurante = await Restaurante.findByIdAndUpdate(
+      id,
+      { isActive },
+      { new: true }
+    );
 
-        if (!restaurante) {
-            return res.status(404).json({
-                success: false,
-                message: 'Restaurante no encontrado',
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: `Restaurante ${action} exitosamente`,
-            data: restaurante,
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Error al cambiar el estado del restaurante',
-            error: error.message,
-        });
+    if (!restaurante) {
+      return res.status(404).json({
+        success: false,
+        message: 'Restaurante no encontrado',
+      });
     }
+
+    res.status(200).json({
+      success: true,
+      message: `Restaurante ${action} exitosamente`,
+      data: restaurante,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error al cambiar el estado del restaurante',
+      error: error.message,
+    });
+  }
 };

@@ -5,7 +5,7 @@ const tableSchema = mongoose.Schema(
     {
         restaurant: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Restaurant',
+            ref: 'Restaurante',
             required: [true, 'El restaurante es requerido']
         },
         tableNumber : {
@@ -24,7 +24,7 @@ const tableSchema = mongoose.Schema(
             type: Boolean,
             default: true
         },
-        asset: {
+        isActive: {
             type: Boolean,
             default: true
         }
@@ -35,9 +35,9 @@ const tableSchema = mongoose.Schema(
     }
 );
 
-tableSchema.index({ asset: 1 });
+tableSchema.index({ isActive: 1 });
 tableSchema.index({ restaurant: 1 });
 tableSchema.index({ tableAvailability: 1 });
-tableSchema.index({ asset: 1, restaurant: 1 });
+tableSchema.index({ isActive: 1, restaurant: 1 });
 
 export default mongoose.model('Table', tableSchema);
