@@ -2,7 +2,14 @@ import Dish from './dish.model.js';
 
 export const createDish = async (req, res) => {
     try {
-        const dish = new Dish(req.body);
+
+        const dishData = req.body;
+        if (req.file){
+            dishData.photo = req.file.path;
+        }
+
+
+        const dish = new Dish(dishData);
         await dish.save();
         res.status(201).json({
             success: true,
@@ -34,6 +41,8 @@ export const getDishes = async (req, res) => {
             .limit(options.limit)
             .skip((options.page - 1) * options.limit)
             .sort(options.sort);
+
+            const total = await Dish.countDocuments(filter);
 
         res.status(200).json({
             success: true,
@@ -83,12 +92,16 @@ export const getDishById = async (req, res) => {
     }
 }
 
-export const UpdateDish = async (req, res) => {
+export const updateDish = async (req, res) => {
 
     try {
 
         const dishId = req.params.id;
         const updateData = req.body;
+
+        if (req.file){
+            updateData.photo = req.file.path;
+        }
 
         const updatedDish = await Dish.findByIdAndUpdate(dishId, updateData, { new: true, runValidators: true });
 

@@ -24,14 +24,18 @@ const dishSchema = new mongoose.Schema({
         type: String,
         required: [true, 'El tipo del platillo es obligatorio'],
         enum: {
-            values: ['Entrada', 'Plato fuerte', 'Postre', 'Bebida'],
-            message: 'El tipo del platillo debe ser uno de los siguientes: Entrada, Plato fuerte, Postre, Bebida'
+            values: ['ENTRADA', 'PLATO_FUERTE', 'POSTRE', 'BEBIDA'],
+            message: 'El tipo del platillo debe ser uno de los siguientes: ENTRADA, PLATO_FUERTE, POSTRE, BEBIDA'
         }
     },
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Restaurant',
         required: [true, 'El restaurante del platillo es obligatorio']
+    },
+    photo: {
+        type: String,
+        default: 'https://res.cloudinary.com/degzwfdz3/image/upload/v1771700198/no-photo_orrdvt.avif',
     },
     isActive: {
         type: Boolean,
@@ -42,11 +46,10 @@ const dishSchema = new mongoose.Schema({
     versionKey: false
 });
 
-dishSchema.index({isActive: 1});
+dishSchema.index({ isActive: 1 });
 dishSchema.index({ restaurant: 1 });
-dishSchema.index({ name: 1 });
 dishSchema.index({ dishType: 1 });
 
-dishSchema.index({ name: 1, restaurant: 1, isActive:1, dishType: 1}, { unique: true });
+dishSchema.index({ name: 1, restaurant: 1, isActive: 1, dishType: 1 }, { unique: true });
 
 export default mongoose.model('Dish', dishSchema);
