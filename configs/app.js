@@ -15,6 +15,8 @@ import clientRoutes from '../src/client/client.routes.js';
 import dishRoutes from '../src/dishes/dish.routes.js';
 import employeeRoutes from '../src/employees/employee.routes.js';
 import eventRoutes from '../src/events/events.routes.js';
+import orderRoutes from '../src/orders/order.routes.js';
+import invoiceRoutes from '../src/invoice/invoice.routes.js';
 
 const BASE_PATH = '/gestionDeRestaurantes/v1';
 
@@ -43,6 +45,8 @@ const routes = (app) => {
     app.use(`${BASE_PATH}/dishes`, dishRoutes);
     app.use(`${BASE_PATH}/employees`, employeeRoutes);
     app.use(`${BASE_PATH}/events`, eventRoutes);
+    app.use(`${BASE_PATH}/orders`, orderRoutes);
+    app.use(`${BASE_PATH}/invoices`, invoiceRoutes);
 
     app.use((req, res) => {
         res.status(404).json({
