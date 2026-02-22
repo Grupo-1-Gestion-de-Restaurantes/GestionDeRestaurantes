@@ -44,7 +44,7 @@ const createCloudinaryUploader = (folder) => {
                 folder: folder,
                 public_id: publicId,
                 allowed_formats: ['jpeg', 'jpg', 'png', 'webp', 'avif'],
-                transformation: [{width: 1000, height: 1000, crop: 'limit'}],
+                transformation: [{ width: 1000, height: 1000, crop: 'limit' }],
                 resource_type: 'image'
             }
         }
@@ -53,7 +53,7 @@ const createCloudinaryUploader = (folder) => {
     return multer({
         storage: storage,
         fileFilter: (req, file, cb) => {
-            if(MIMETYPES.includes(file.mimetype)){
+            if (MIMETYPES.includes(file.mimetype)) {
                 cb(null, true);
             } else {
                 cb(new Error(`Solo se permiten imágenes: ${MIMETYPES.join(', ')}`));
@@ -66,7 +66,17 @@ const createCloudinaryUploader = (folder) => {
 }
 
 export const uploadFieldImage = createCloudinaryUploader(
-    process.env.CLOUDINARY_FOLDER || 'kinal_sports/fields'
+    process.env.CLOUDINARY_FOLDER_RESTAURANTS || 'gestionrestaurantes/restaurants'
 )
+
+export const uploadDishImage = createCloudinaryUploader(
+    process.env.CLOUDINARY_FOLDER_DISHES || 'gestionrestaurantes/dishes'
+)
+
+// Para casos donde no se quiera subir a Cloudinary.
+export const uploadMemory = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
 
 export { cloudinary }
