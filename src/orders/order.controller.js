@@ -1,6 +1,7 @@
 import Order from "./order.model.js";
 import Dish from "../dishes/dish.model.js";
 import Restaurante from "../restaurants/restaurant.model.js";
+import Invoice from "../invoice/invoice.model.js";
 
 export const createOrder = async (req, res) => {
     try {
@@ -20,7 +21,6 @@ export const createOrder = async (req, res) => {
 
         let totalOrder = 0;
         const hydratedItems = await Promise.all(items.map(async (item) => {
-            // Validamos que el plato exista, esté activo y sea del restaurante
             const dish = await Dish.findOne({
                 _id: item.dishId,
                 restaurant: restaurantId,
@@ -44,7 +44,7 @@ export const createOrder = async (req, res) => {
         }));
 
         const newOrder = new Order({
-            client: client._id || client.uid,
+            client: client.uid || client._id,
             restaurant: restaurantId,
             items: hydratedItems,
             total: totalOrder,
@@ -58,12 +58,33 @@ export const createOrder = async (req, res) => {
             paymentMethod
         });
 
-        await newOrder.save();
+        const savedOrder = await newOrder.save();
+        const invoiceCount = await Invoice.countDocuments();
+        const invoiceNumber = `INV-${Date.now()}-${(invoiceCount + 1).toString().padStart(4, '0')}`;
+
+        const newInvoice = new Invoice({
+            invoiceNumber,
+            order: savedOrder._id, 
+            client: client.uid || client._id,
+            clientName: client.name,
+            restaurant: restaurantId,
+            items: hydratedItems.map(i => ({
+                name: i.name,
+                quantity: i.quantity,
+                price: i.price,
+                subtotal: i.subtotal
+            })),
+            total: totalOrder,
+            paymentMethod
+        });
+
+        const savedInvoice = await newInvoice.save();
 
         res.status(201).json({
             success: true,
-            message: "Pedido creado correctamente",
-            order: newOrder
+            message: "Pedido y Factura creados correctamente",
+            order: savedOrder,
+            invoice: savedInvoice
         });
 
     } catch (error) {
