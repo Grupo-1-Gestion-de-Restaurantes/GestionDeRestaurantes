@@ -11,6 +11,9 @@ import { requestLimit } from '../middlewares/request-limit.js';
 import { errorHandler } from '../middlewares/handle-errors.js';
 import restaurantRoutes from '../src/restaurants/restaurant.routes.js';
 import tableRoutes from '../src/table/table.routes.js';
+import dishRoutes from '../src/dishes/dish.routes.js';
+import employeeRoutes from '../src/employees/employee.routes.js';
+import eventRoutes from '../src/events/events.routes.js';
 
 const BASE_PATH = '/gestionDeRestaurantes/v1';
 
@@ -35,6 +38,9 @@ const routes = (app) => {
 
     app.use(`${BASE_PATH}/restaurants`, restaurantRoutes);
     app.use(`${BASE_PATH}/tables`, tableRoutes);
+    app.use(`${BASE_PATH}/dishes`, dishRoutes);
+    app.use(`${BASE_PATH}/employees`, employeeRoutes);
+    app.use(`${BASE_PATH}/events`, eventRoutes);
 
     app.use((req, res) => {
         res.status(404).json({
