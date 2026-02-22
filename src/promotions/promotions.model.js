@@ -21,11 +21,10 @@ const promotionSchema = new mongoose.Schema({
         min: [0, 'El porcentaje de descuento no puede ser negativo'],
         max: [100, 'El porcentaje de descuento no puede ser mayor a 100']
     },
-    dishesApplicables: {
-        type: [mongoose.Schema.Types.ObjectId],
-        ref: 'Dish',
-        required: [true, 'Las platos aplicables son obligatorios']
-    },
+    dishesApplicables: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Dish'
+    }],
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Restaurant',
