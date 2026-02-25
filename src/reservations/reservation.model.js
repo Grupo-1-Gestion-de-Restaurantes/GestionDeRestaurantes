@@ -38,7 +38,11 @@ const reservationSchema = new mongoose.Schema({
     specialRequests: {
         type: String,
         trim: true
-    }
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
 }, { 
     timestamps: true,
     versionKey: false 
