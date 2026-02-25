@@ -4,8 +4,11 @@ const sendRollbackError = async (userId) => {
     try {
         await fetch(`${process.env.AUTH_SERVICE_URL}/api/v1/auth/rollbackUser/${userId}`, {
             method: 'DELETE',
-            headers: { 'Authorization': req.headers['authorization'] }
+            headers: { 'Authorization': req.headers['authorization'] }    
         });
+
+        console.log("Rollback realizado exitosamente");
+
     } catch (rollbackError) {
         console.error("Error al intentar hacer rollback en AuthService:", rollbackError.message);
     }
@@ -71,6 +74,13 @@ export const createEmployee = async (req, res) => {
             data: newEmployee,
             authData: authData
         });
+
+        await sendRollbackError(createdUserId);
+
+
+
+
+
 
     } catch (error) {
         // Si falla, intenta hacer rollback en AuthService para eliminar el usuario creado

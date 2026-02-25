@@ -5,7 +5,7 @@ import { createDish, changeDishStatus, getDishById, getDishes, updateDish } from
 
 const router = Router();
 
-router.get('/',getDishes);
+router.get('/', getDishes);
 
 router.get('/:id', getDishById);
 
