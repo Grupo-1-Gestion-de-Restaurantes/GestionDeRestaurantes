@@ -55,6 +55,11 @@ export const validateCreateRestaurant = [
         .optional()
         .isLength({ min: 1, max: 5 })
         .withMessage('La calificacion no puede ser menor que 1, ni mayor que 5'),
+    body('capacity')
+        .notEmpty()
+        .withMessage('La capacidad es requerida')
+        .isLength({min: 1})
+        .withMessage('La capacidad no puede ser menor a 1'),
     checkValidators,
 ];
 

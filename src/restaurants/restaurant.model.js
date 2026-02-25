@@ -77,6 +77,11 @@ const restaurantSchema = mongoose.Schema(
       min: [1, "El rating mínimo es 1"],
       max: [5, "El rating máximo es 5"],
       default: 5
+    },
+
+    capacity: {
+      type: Number,
+      min: [1, "La capacidad no puede ser menor a 1"]
     }
   },
   {

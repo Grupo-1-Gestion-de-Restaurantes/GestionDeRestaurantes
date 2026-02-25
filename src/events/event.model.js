@@ -27,7 +27,6 @@ const eventSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'La capacidad del evento es obligatoria'],
         min: [1, 'La capacidad del evento debe ser al menos 1'],
-        max: [10000, 'La capacidad del evento no puede ser mayor a 10,000 personas']
     },
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
