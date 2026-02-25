@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createClient, getClients , getClientById, updateClient, addAddressToClient, changeClientStatus } from './client.controller.js';
-import { validateCreateClient, validateClientById,validateUpdateClientRequest, validateAddAddressToClient, validateClientStatusChange } from '../../middlewares/client-validators.js';
+import { validateGetClients, validateCreateClient, validateClientById,validateUpdateClientRequest, validateAddAddressToClient, validateClientStatusChange } from '../../middlewares/client-validators.js';
 
 const router = Router();
 
@@ -12,6 +12,7 @@ router.post(
 
 router.get(
     '/get',
+    validateGetClients,
     getClients
 )
 
