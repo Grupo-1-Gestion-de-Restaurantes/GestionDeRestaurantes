@@ -10,6 +10,7 @@ import { helmetConfiguration } from './helmet-configuration.js';
 import { requestLimit } from '../middlewares/request-limit.js';
 import { errorHandler } from '../middlewares/handle-errors.js';
 import restaurantRoutes from '../src/restaurants/restaurant.routes.js';
+import reservationRoutes from '../src/reservations/reservation.routes.js'
 import tableRoutes from '../src/table/table.routes.js';
 import clientRoutes from '../src/client/client.routes.js';
 import dishRoutes from '../src/dishes/dish.routes.js';
@@ -42,6 +43,7 @@ const routes = (app) => {
     app.use(`${BASE_PATH}/restaurants`, restaurantRoutes);
     app.use(`${BASE_PATH}/tables`, tableRoutes);
     app.use(`${BASE_PATH}/clients`, clientRoutes);
+    app.use(`${BASE_PATH}/reservations`, reservationRoutes);
     app.use(`${BASE_PATH}/dishes`, dishRoutes);
     app.use(`${BASE_PATH}/employees`, employeeRoutes);
     app.use(`${BASE_PATH}/events`, eventRoutes);
