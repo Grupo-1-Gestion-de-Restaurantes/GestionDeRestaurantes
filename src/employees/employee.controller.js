@@ -1,17 +1,7 @@
 import Employee from './employee.model.js';
 
-const sendRollbackError = async (userId) => {
-    try {
-        await fetch(`${process.env.AUTH_SERVICE_URL}/api/v1/auth/rollbackUser/${userId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': req.headers['authorization'] }    
-        });
-
-        console.log("Rollback realizado exitosamente");
-
-    } catch (rollbackError) {
-        console.error("Error al intentar hacer rollback en AuthService:", rollbackError.message);
-    }
+const sendRollbackError = async (userId, req) => {
+    console.warn(`[ROLLBACK PENDIENTE] El usuario ${userId} fue creado en AuthService pero falló el registro del empleado. Eliminarlo manualmente si es necesario.`);
 }
 
 export const createEmployee = async (req, res) => {
@@ -34,7 +24,7 @@ export const createEmployee = async (req, res) => {
         }
 
 
-        const authResponse = await fetch(`${process.env.AUTH_SERVICE_URL}/api/v1/auth/register-employee`, {
+        const authResponse = await fetch(`${process.env.AUTH_SERVICE_URL}/api/v1/auth/register`, {
             method: 'POST',
             headers: {
                 'Authorization': req.headers['authorization']
@@ -42,12 +32,26 @@ export const createEmployee = async (req, res) => {
             body: formData
         });
 
-        const authData = await authResponse.json();
+        const rawText = await authResponse.text();
+        let authData = null;
+        try {
+            authData = rawText ? JSON.parse(rawText) : {};
+        } catch {
+            console.error('AuthService respondió con body no-JSON:', rawText);
+            return res.status(502).json({
+                success: false,
+                message: 'Respuesta inválida del AuthService',
+                error: rawText || 'Body vacío'
+            });
+        }
 
         if (!authResponse.ok) {
-            return res.status(401).json({
+            console.error(`AuthService respondió ${authResponse.status} ${authResponse.statusText}:`, authData);
+            return res.status(authResponse.status).json({
                 success: false,
                 message: 'No se pudo registrar en AuthService',
+                authStatus: authResponse.status,
+                authStatusText: authResponse.statusText,
                 error: authData
             });
         }
@@ -56,8 +60,11 @@ export const createEmployee = async (req, res) => {
 
         const existingEmployee = await Employee.findOne({ userId: createdUserId });
         if (existingEmployee) {
-            await sendRollbackError(createdUserId);
-
+            await sendRollbackError(createdUserId, req);
+            return res.status(409).json({
+                success: false,
+                message: 'El empleado ya existe'
+            });
         }
 
         const newEmployee = new Employee({
@@ -68,14 +75,12 @@ export const createEmployee = async (req, res) => {
 
         await newEmployee.save();
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: 'Empleado creado y registrado exitosamente',
             data: newEmployee,
             authData: authData
         });
-
-        await sendRollbackError(createdUserId);
 
 
 
@@ -85,7 +90,7 @@ export const createEmployee = async (req, res) => {
     } catch (error) {
         // Si falla, intenta hacer rollback en AuthService para eliminar el usuario creado
         if (createdUserId) {
-            await sendRollbackError(createdUserId);
+            await sendRollbackError(createdUserId, req);
         }
         console.error("Error al crear el empleado:", error);
         res.status(500).json({
@@ -167,7 +172,11 @@ export const getEmployeeById = async (req, res) => {
 export const updateEmployee = async (req, res) => {
     try {
         const employeeId = req.params.id;
-        const updateData = req.body;
+        const { restaurant, specialty } = req.body;
+        const updateData = {};
+        if (restaurant !== undefined) updateData.restaurant = restaurant;
+        if (specialty !== undefined) updateData.specialty = specialty;
+
         const updatedEmployee = await Employee.findByIdAndUpdate(employeeId, updateData, { new: true, runValidators: true });
 
         if (!updatedEmployee) {
