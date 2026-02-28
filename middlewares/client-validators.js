@@ -2,6 +2,7 @@ import { body, param } from 'express-validator';
 import { checkValidators } from './checkValidators.js';
 import { validateJWT } from './validate-JWT.js';
 import { syncClient } from './syncClient.js';
+import { requireRole } from './validate-role.js';
 
 // Validaciones para crear campos (field)
 export const validateCreateClient = [
@@ -88,10 +89,15 @@ export const validateClientStatusChange = [
     checkValidators,
 ];
 
-
+export const validateGetClients = [
+    validateJWT,
+    requireRole('ADMIN_ROLE')
+]
 
 // Validación para obtener cliente por ID
 export const validateClientById = [
+    validateJWT,
+    requireRole('ADMIN_ROLE'),
     param('id')
         .notEmpty().withMessage('El ID es obligatorio')
         .isString().withMessage('El ID debe ser una cadena de texto'),
