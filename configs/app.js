@@ -57,6 +57,8 @@ const routes = (app) => {
             message: 'Endpoint no encontrado en la API'
         });
     });
+
+    app.use(errorHandler);
 };
 
 export const initServer = async () => {

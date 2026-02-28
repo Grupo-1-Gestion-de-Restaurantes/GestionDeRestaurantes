@@ -1,4 +1,4 @@
-export const errorHandler = (err, req, res) => {
+export const errorHandler = (err, req, res, next) => {
     console.error(`Error in Admin Server: ${err.message}`);
     console.error(`Stack trace: ${err.stack}`);
     console.error(`Request: ${req.method} ${req.path}`);

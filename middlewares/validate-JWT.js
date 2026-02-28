@@ -37,7 +37,7 @@ export const validateJWT = (req, res, next) => {
         // Log para debug - remover en producción
         if (!decoded.role) {
             console.warn(
-                `Token sin restaurante 'role' para usuario ${decoded.sub}. Payload:`,
+                `Token sin campo 'role' para usuario ${decoded.sub}. Payload:`,
                 JSON.stringify(decoded, null, 2)
             );
         }
