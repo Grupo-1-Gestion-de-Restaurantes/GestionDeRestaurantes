@@ -34,44 +34,44 @@ export const createReservation = async (req, res) => {
 }
 
 export const getReservations = async (req, res) => {
-  try {
-    const { page = 1, limit = 10, isActive = true } = req.query;
+    try {
+        const { page = 1, limit = 10, isActive = true } = req.query;
 
-    const filter = { isActive };
+        const filter = { isActive };
 
-    const options = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sort: { createdAt: -1 }
+        const options = {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            sort: { createdAt: -1 }
+        }
+
+
+
+        const reservation = await Reservation.find()
+            .limit(limit * 1)
+            .skip((page - 1) * limit)
+            .sort(options.sort);
+
+        const total = await Reservation.countDocuments();
+
+        res.status(200).json({
+            success: true,
+            data: reservation,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(total / limit),
+                totalRecords: total,
+                limit,
+                reservation
+            }
+        })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener los reservaciones',
+            error: error.message
+        })
     }
-
-
-
-    const reservation = await Reservation.find()
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort(options.sort);
-
-    const total = await Reservation.countDocuments();
-
-    res.status(200).json({
-      success: true,
-      data: reservation,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        totalRecords: total,
-        limit,
-        reservation
-      }
-    })
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener los reservaciones',
-      error: error.message
-    })
-  }
 };
 
 export const getReservationById = async (req, res) => {

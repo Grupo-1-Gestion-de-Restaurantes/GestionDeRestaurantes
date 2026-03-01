@@ -10,9 +10,12 @@ export const validateCreateClient = [
     syncClient,
     body('name')
         .trim()
-        .notEmpty().withMessage('El nombre es obligatorio'),
+        .optional()
+        .notEmpty()
+        .withMessage('El nombre no puede estar vacío'),
     body('email')
         .trim()
+        .optional()
         .isEmail().withMessage('Debe ser un correo electrónico válido'),
     body('phone')
         .trim()
@@ -36,6 +39,7 @@ export const validateCreateClient = [
 
 export const validateUpdateClientRequest = [
     validateJWT,
+    requireRole('ADMIN_ROLE', 'CLIENT_ROLE'),
     syncClient,
     body('name')
         .optional()
@@ -81,7 +85,7 @@ export const validateAddAddressToClient = [
 ];
 
 
-// Validaciones para activar/desactivar campos
+// Validaciones para activar/desactivar 
 export const validateClientStatusChange = [
     param('id')
         .notEmpty().withMessage('El ID es obligatorio')
@@ -91,7 +95,8 @@ export const validateClientStatusChange = [
 
 export const validateGetClients = [
     validateJWT,
-    requireRole('ADMIN_ROLE')
+    requireRole('ADMIN_ROLE'),
+    checkValidators,
 ]
 
 // Validación para obtener cliente por ID
@@ -103,3 +108,9 @@ export const validateClientById = [
         .isString().withMessage('El ID debe ser una cadena de texto'),
     checkValidators,
 ];
+
+export const validateGetMyInfo = [
+    validateJWT,
+    syncClient,
+    checkValidators,
+]

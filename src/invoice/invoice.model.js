@@ -8,6 +8,7 @@ const invoiceSchema = new mongoose.Schema({
     client: { type: String, required: true },
     clientName: String,
     restaurant: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurante', required: true },
+    restaurantName: String,
     items: [{
         name: String,
         quantity: Number,

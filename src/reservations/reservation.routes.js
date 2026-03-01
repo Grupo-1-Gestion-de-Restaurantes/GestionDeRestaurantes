@@ -1,17 +1,26 @@
 import { Router } from 'express';
 import { validateJWT } from "../../middlewares/validate-JWT.js"
 import { changeReservationStatus, createReservation, getReservationById, getReservations, updateReservation, getMyReservations } from './reservation.controller.js';
+import { 
+    validateCreateReservation, 
+    validateGetReservations, 
+    validateUpdateReservation, 
+    validateReservationId 
+} from '../../middlewares/reservations-validators.js';
+
 const router = Router();
 
 router.post(
     '/create',
+    validateCreateReservation,
     createReservation
-)
+);
 
 router.get(
     '/get',
+    validateGetReservations,
     getReservations
-)
+);
 
 router.get(
   '/my-reservations',
@@ -20,12 +29,27 @@ router.get(
 );
 
 router.get('/:id', getReservationById);
+    '/:id', 
+    validateReservationId, 
+    getReservationById
+);
 
-// Rutas PUT - Requieren autenticación
 router.put(
     '/:id',
+    validateUpdateReservation,
     updateReservation
 );
-router.put('/:id/activate', changeReservationStatus);
-router.put('/:id/desactivate', changeReservationStatus);
+
+router.put(
+    '/:id/activate', 
+    validateReservationId, 
+    changeReservationStatus
+);
+
+router.put(
+    '/:id/deactivate', 
+    validateReservationId, 
+    changeReservationStatus
+);
+
 export default router;

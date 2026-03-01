@@ -7,19 +7,22 @@ export const syncClient = async (req, res, next) => {
                 success: false,
                 message: "ID de usuario no disponible"
             });
-        }
 
-        const { id } = req.user;
+        const { id, name, email } = req.user; 
 
         const user = await Client.findOneAndUpdate(
-            { id: id },
-            {
-                $setOnInsert: {
-                    id: id,
+            { _id: id },
+            { 
+                $set: { 
+                    name: name,
+                    email: email
+                },
+                $setOnInsert: { 
+                    _id: id, 
                     isActive: true
                 }
             },
-            { upsert: true, new: true }
+            { upsert: true, new: true, runValidators: false } 
         );
 
         req.user = user;
@@ -29,7 +32,7 @@ export const syncClient = async (req, res, next) => {
         console.error(error);
         res.status(500).json({
             success: false,
-            message: "Error en la sincronización del cliente",
+            message: "Error en la sincronización",
             error: error.message
         });
     }
