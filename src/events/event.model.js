@@ -28,6 +28,15 @@ const eventSchema = new mongoose.Schema({
         required: [true, 'La capacidad del evento es obligatoria'],
         min: [1, 'La capacidad del evento debe ser al menos 1'],
     },
+    price: {
+        type: Number,
+        required: [true, 'El precio del evento es obligatorio'],
+        min: [0, 'El precio del evento no puede ser negativo']
+    },
+    attendees: [{
+        type: String, ref: 'Client', default: []
+    }
+    ],
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Restaurant',

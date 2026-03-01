@@ -1,17 +1,18 @@
 import { Router } from 'express';
-import { createEvent, changeEventStatus, getEventById, getEvents, updateEvent } from './event.controller.js';
-import { validateCreateEvent, validateUpdateEventRequest, validateRestaurantStatusChange, validateGetRestaurantdById} from '../../middlewares/event-validators.js'
+import { createEvent, changeEventStatus, getEventById, getEvents, updateEvent, subscribeToEvent } from './event.controller.js';
+import { validateCreateEvent, validateUpdateEventRequest, validateRestaurantStatusChange, validateSuscribeToEvent,validateGetEvents,validateGetEventById} from '../../middlewares/event-validators.js'
 
 const router = Router();
 
 router.get(
     '/', 
+    validateGetEvents,
     getEvents
 );
 
 router.get(
     '/:id', 
-    validateGetRestaurantdById,
+    validateGetEventById,
     getEventById
 );
 
@@ -31,6 +32,12 @@ router.patch(
     '/:id', 
     validateRestaurantStatusChange,
     changeEventStatus
+);
+
+router.patch(
+    '/:id/subscribe', 
+    validateSuscribeToEvent,
+    subscribeToEvent
 );
 
 export default router;

@@ -19,6 +19,7 @@ import eventRoutes from '../src/events/events.routes.js';
 import orderRoutes from '../src/orders/order.routes.js';
 import invoiceRoutes from '../src/invoice/invoice.routes.js';
 import promotionsRoutes from '../src/promotions/promotions.routes.js';
+import inventoryRoutes from '../src/inventories/inventory.routes.js';
 import commentRoutes from '../src/comments/comment.routes.js';
 
 const BASE_PATH = '/gestionDeRestaurantes/v1';
@@ -52,6 +53,7 @@ const routes = (app) => {
     app.use(`${BASE_PATH}/orders`, orderRoutes);
     app.use(`${BASE_PATH}/invoices`, invoiceRoutes);
     app.use(`${BASE_PATH}/promotions`, promotionsRoutes);
+    app.use(`${BASE_PATH}/inventories`, inventoryRoutes);
     app.use(`${BASE_PATH}/comments`, commentRoutes);
     app.use((req, res) => {
         res.status(404).json({

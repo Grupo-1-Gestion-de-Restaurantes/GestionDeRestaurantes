@@ -17,6 +17,18 @@ export const createEmployee = async (req, res) => {
         formData.append('email', employeeData.email);
         formData.append('password', employeeData.password);
         formData.append('phone', employeeData.phone);
+        formData.append('role', employeeData.role);
+
+        if (req.user.role === 'MANAGER_ROLE') {
+            // obtener el restaurante del manager para forzar que este creando un empleado para su restaurante
+            const userRestaurant = await Employee.findOne({ userId: req.user.id }).select('restaurant');
+            if (userRestaurant.restaurant.toString() !== employeeData.restaurant) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Solo puedes crear empleados para tu propio restaurante',
+                });
+            }
+        }
 
         if (req.file) {
             const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
@@ -24,7 +36,7 @@ export const createEmployee = async (req, res) => {
         }
 
 
-        const authResponse = await fetch(`${process.env.AUTH_SERVICE_URL}/api/v1/auth/register`, {
+        const authResponse = await fetch(`${process.env.AUTH_SERVICE_URL}/api/v1/auth/register-employee`, {
             method: 'POST',
             headers: {
                 'Authorization': req.headers['authorization']
@@ -70,7 +82,7 @@ export const createEmployee = async (req, res) => {
         const newEmployee = new Employee({
             userId: createdUserId,
             restaurant: employeeData.restaurant,
-            specialty: employeeData.specialty
+            specialty: (employeeData.role === 'MANAGER_ROLE') ? "ADMINISTRATIVO" : employeeData.specialty
         });
 
         await newEmployee.save();
@@ -81,11 +93,6 @@ export const createEmployee = async (req, res) => {
             data: newEmployee,
             authData: authData
         });
-
-
-
-
-
 
     } catch (error) {
         // Si falla, intenta hacer rollback en AuthService para eliminar el usuario creado
