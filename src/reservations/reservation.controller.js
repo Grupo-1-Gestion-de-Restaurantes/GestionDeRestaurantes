@@ -1,4 +1,5 @@
-import Reservation from "./reservation.model.js";
+import Reservation from './reservation.model.js';
+import { notificationService } from '../notifications/notification.service.js';
 
 export const createReservation = async (req, res) => {
     try {
@@ -7,6 +8,15 @@ export const createReservation = async (req, res) => {
 
         const reservation = new Reservation(reservationData);
         await reservation.save();
+
+        await notificationService.createAndEmit(
+            String(reservation.client),
+            'RESERVACION_RECIBIDA',
+            'Reservación recibida',
+            'Tu reservación ha sido registrada y está pendiente de confirmación.',
+            reservation._id,
+            'Reservation'
+        );
 
         res.status(201).json({
             success: true,
@@ -108,6 +118,25 @@ export const updateReservation = async (req, res) => {
             runValidators: true,
         });
 
+        const notifMap = {
+            CONFIRMADA: { type: 'RESERVACION_CONFIRMADA', title: 'Reservación confirmada',  message: 'Tu reservación ha sido confirmada. ¡Te esperamos!' },
+            CANCELADA:  { type: 'RESERVACION_CANCELADA',  title: 'Reservación cancelada',    message: 'Tu reservación ha sido cancelada.' },
+            COMPLETADA: { type: 'RESERVACION_COMPLETADA', title: 'Reservación completada',   message: 'Gracias por visitarnos. ¡Esperamos verte pronto!' },
+            NO_ASISTIO: { type: 'RESERVACION_NO_ASISTIO', title: 'Reservación: no asistió',  message: 'Registramos que no pudiste asistir a tu reservación.' },
+        };
+
+        if (updateData.status && notifMap[updateData.status]) {
+            const notif = notifMap[updateData.status];
+            await notificationService.createAndEmit(
+                String(updatedReservation.client),
+                notif.type,
+                notif.title,
+                notif.message,
+                updatedReservation._id,
+                'Reservation'
+            );
+        }
+
         res.status(200).json({
             success: true,
             message: "Reservación actualizada exitosamente",
@@ -151,6 +180,42 @@ export const changeReservationStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al cambiar el estado del reservación',
+            error: error.message,
+        });
+    }
+};
+
+export const getMyReservations = async (req, res) => {
+    try {
+        const client = String(req.user.id);
+        const { page = 1, limit = 10 } = req.query;
+
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+
+        const reservations = await Reservation.find({ client })
+            .sort({ reservationDate: -1 })
+            .skip((parsedPage - 1) * parsedLimit)
+            .limit(parsedLimit)
+            .populate('restaurant', 'name address')
+            .populate('table', 'tableNumber');
+
+        const total = await Reservation.countDocuments({ client });
+
+        res.status(200).json({
+            success: true,
+            data: reservations,
+            pagination: {
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
+                totalRecords: total,
+                limit: parsedLimit,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener las reservaciones',
             error: error.message,
         });
     }
