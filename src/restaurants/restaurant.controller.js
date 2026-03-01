@@ -1,4 +1,6 @@
 import Restaurante from "../restaurants/restaurant.model.js";
+import Reservation from "../reservations/reservation.model.js";
+import Order from "../orders/order.model.js";
 
 export const createRestaurante = async (req, res) => {
   try {
@@ -167,4 +169,47 @@ export const changeRestauranteStatus = async (req, res) => {
       error: error.message,
     });
   }
+};
+
+export const getActivity = async (req, res) => {
+    try {
+        const { id } = req.params; 
+
+        const [reservations, orders] = await Promise.all([
+            Reservation.find({ restaurant: id, isActive: true })
+                .populate('table', 'number location capacity') 
+                .sort({ reservationDate: 1 }),
+            Order.find({ restaurant: id })
+                .sort({ createdAt: -1 })
+                .limit(20) 
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            restaurantId: id,
+            activeReservations: reservations.map(res => ({
+                id: res._id,
+                fecha: res.reservationDate,
+                cliente: res.client,
+                personas: res.numberOfPeople,
+                mesa: res.table?.number || "N/A",
+                ubicacion: res.table?.location || "General",
+                estado: res.status
+            })),
+            recentOrders: orders.map(order => ({
+                id: order._id,
+                tipo: order.deliveryType, 
+                total: `Q${order.total.toFixed(2)}`,
+                estado: order.status,
+                hora: order.createdAt
+            }))
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Error al consultar la actividad en vivo",
+            error: error.message
+        });
+    }
 };
