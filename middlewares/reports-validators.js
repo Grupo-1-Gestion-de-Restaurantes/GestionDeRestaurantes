@@ -1,8 +1,8 @@
 import { validateJWT } from './validate-JWT.js';
 import { requireRole } from './validate-role.js';
-import { body, param } from 'express-validator';
+import { param } from 'express-validator';
 import { checkValidators } from './checkValidators.js';
-import Employee from '../employees/employee.model.js';
+import Employee from '../src/employees/employee.model.js';
 
 export const validateRestaurantAdmin = async (req, res, next) => {
     try {
