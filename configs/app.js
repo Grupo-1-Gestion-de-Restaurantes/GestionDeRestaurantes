@@ -1,5 +1,6 @@
 'use strict';
 
+import { createServer } from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -21,6 +22,8 @@ import invoiceRoutes from '../src/invoice/invoice.routes.js';
 import promotionsRoutes from '../src/promotions/promotions.routes.js';
 import inventoryRoutes from '../src/inventories/inventory.routes.js';
 import commentRoutes from '../src/comments/comment.routes.js';
+import notificationRoutes from '../src/notifications/notification.routes.js';
+import { initializeSocket } from '../src/notifications/notification.service.js';
 
 const BASE_PATH = '/gestionDeRestaurantes/v1';
 
@@ -55,6 +58,7 @@ const routes = (app) => {
     app.use(`${BASE_PATH}/promotions`, promotionsRoutes);
     app.use(`${BASE_PATH}/inventories`, inventoryRoutes);
     app.use(`${BASE_PATH}/comments`, commentRoutes);
+    app.use(`${BASE_PATH}/notifications`, notificationRoutes);
     app.use((req, res) => {
         res.status(404).json({
             success: false,
@@ -75,10 +79,11 @@ export const initServer = async () => {
         await dbConnection();
         middlewares(app);
         routes(app);
-        
 
+        const httpServer = createServer(app);
+        initializeSocket(httpServer);
 
-        app.listen(PORT, () => {
+        httpServer.listen(PORT, () => {
             console.log(`Gestion Restaurantes server running on port ${PORT}`);
             console.log(`Health check: http://localhost:${PORT}${BASE_PATH}/health`);
         });
