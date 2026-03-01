@@ -15,9 +15,9 @@ export const validateCreateOrder = [
         .notEmpty().withMessage('El método de pago es obligatorio')
         .isIn(['EFECTIVO', 'TARJETA']).withMessage('Método de pago debe ser EFECTIVO o TARJETA'),
 
-    body('addressId')
-        .optional()
-        .isMongoId().withMessage('El ID de la dirección debe ser un ID válido de MongoDB'),
+    body('tableId')
+        .notEmpty().withMessage('El ID de la mesa es obligatorio')
+        .isMongoId().withMessage('El ID de la mesa debe ser un ID válido de MongoDB'),
 
     body('items')
         .isArray({ min: 1 }).withMessage('El pedido debe contener al menos un plato'),
@@ -47,11 +47,10 @@ export const validateGetMyOrders = [
         .withMessage('El límite debe ser mayor a 0'),
     query('status')
         .optional()
-        .isIn(['PENDIENTE', 'CONFIRMADA', 'EN_CAMINO', 'ENTREGADO', 'CANCELADA']),
+        .isIn(['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'LISTO', 'ENTREGADO', 'CANCELADO']),
     checkValidators
 ];
 
-// Validador para pedido por ID
 export const validateGetOrderById = [
     validateJWT,
     syncClient,
@@ -65,7 +64,7 @@ export const validateUpdateStatus = [
     param('id').isMongoId().withMessage('ID de pedido no válido'),
     body('status')
         .notEmpty().withMessage('El estado es obligatorio')
-        .isIn(['PENDIENTE', 'CONFIRMADA', 'EN_CAMINO', 'ENTREGADO', 'CANCELADA'])
+        .isIn(['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'LISTO', 'ENTREGADO', 'CANCELADO'])
         .withMessage('Estado no válido'),
     checkValidators
 ];

@@ -4,6 +4,35 @@ import Restaurante from "../restaurants/restaurant.model.js";
 import Invoice from "../invoice/invoice.model.js";
 import InventoryItem from "../inventories/inventory.model.js";
 import Promotion from "../promotions/promotions.model.js";
+import { notificationService } from '../notifications/notification.service.js';
+
+const ORDER_NOTIFICATION_MAP = {
+    CONFIRMADO: {
+        type: 'PEDIDO_CONFIRMADO',
+        title: 'Pedido confirmado',
+        message: 'Tu pedido ha sido confirmado. Tiempo estimado de preparación: 30 minutos.',
+    },
+    EN_PREPARACION: {
+        type: 'PEDIDO_EN_PREPARACION',
+        title: 'Pedido en preparación',
+        message: 'Tu pedido está siendo preparado. Tiempo estimado: 20 minutos.',
+    },
+    LISTO: {
+        type: 'PEDIDO_LISTO',
+        title: 'Pedido listo',
+        message: 'Tu pedido está listo y será servido en tu mesa en breve.',
+    },
+    ENTREGADO: {
+        type: 'PEDIDO_ENTREGADO',
+        title: 'Pedido entregado',
+        message: '¡Tu pedido ha sido entregado! Buen provecho.',
+    },
+    CANCELADO: {
+        type: 'PEDIDO_CANCELADO',
+        title: 'Pedido cancelado',
+        message: 'Tu pedido ha sido cancelado.',
+    },
+};
 
 export const createOrder = async (req, res) => {
     try {
@@ -132,6 +161,15 @@ export const createOrder = async (req, res) => {
 
         const savedInvoice = await newInvoice.save();
 
+        await notificationService.createAndEmit(
+            String(savedOrder.client),
+            'PEDIDO_RECIBIDO',
+            'Pedido recibido',
+            'Tu pedido ha sido recibido y está pendiente de confirmación.',
+            savedOrder._id,
+            'Order'
+        );
+
         res.status(201).json({
             success: true,
             message: "Pedido y Factura creados correctamente",
@@ -225,7 +263,9 @@ export const updateOrderStatus = async (req, res) => {
             });
         }
 
-        if (status === 'CANCELADA') {
+        const normalizedStatus = status.toUpperCase();
+
+        if (normalizedStatus === 'CANCELADO') {
             if (order.client.toString() !== (user.uid || user._id).toString()) {
                 return res.status(403).json({
                     success: false,
@@ -242,9 +282,21 @@ export const updateOrderStatus = async (req, res) => {
 
         const updatedOrder = await Order.findByIdAndUpdate(
             id,
-            { status: status.toUpperCase() },
+            { status: normalizedStatus },
             { returnDocument: 'after', runValidators: true }
         ).populate('restaurant', 'name');
+
+        if (ORDER_NOTIFICATION_MAP[normalizedStatus]) {
+            const notif = ORDER_NOTIFICATION_MAP[normalizedStatus];
+            await notificationService.createAndEmit(
+                String(updatedOrder.client),
+                notif.type,
+                notif.title,
+                notif.message,
+                updatedOrder._id,
+                'Order'
+            );
+        }
 
         res.status(200).json({
             success: true,
