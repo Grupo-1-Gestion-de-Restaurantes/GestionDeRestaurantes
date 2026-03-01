@@ -81,7 +81,7 @@ export const validateAddAddressToClient = [
 ];
 
 
-// Validaciones para activar/desactivar campos
+// Validaciones para activar/desactivar 
 export const validateClientStatusChange = [
     param('id')
         .notEmpty().withMessage('El ID es obligatorio')
@@ -91,7 +91,8 @@ export const validateClientStatusChange = [
 
 export const validateGetClients = [
     validateJWT,
-    requireRole('ADMIN_ROLE')
+    requireRole('ADMIN_ROLE'),
+    checkValidators,
 ]
 
 // Validación para obtener cliente por ID
