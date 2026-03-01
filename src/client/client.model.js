@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 
 const clientSchema = mongoose.Schema(
     {
-        id: {
+        _id: {
             type: String,
             unique: true,
             trim: true,

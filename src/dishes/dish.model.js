@@ -28,6 +28,10 @@ const dishSchema = new mongoose.Schema({
             message: 'El tipo del platillo debe ser uno de los siguientes: ENTRADA, PLATO_FUERTE, POSTRE, BEBIDA'
         }
     },
+    ingredients: [{
+        inventoryItem: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', required: true },
+        quantityUsed: { type: Number, required: true } // La cantidad que usa el plato
+    }],
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Restaurant',
