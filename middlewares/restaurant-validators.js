@@ -65,7 +65,7 @@ export const validateCreateRestaurant = [
 
 export const validateUpdateRetaurantRequest = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE' ),
     param('id')
         .isMongoId()
         .withMessage('ID debe ser un ObjectId válido de MongoDB'),
@@ -131,6 +131,7 @@ export const validateRestaurantStatusChange = [
 
 // Validación para obtener restaurante por ID
 export const validateGetRestaurantdById = [
+    validateJWT,
     param('id')
         .isMongoId()
         .withMessage('ID debe ser un ObjectId válido de MongoDB'),

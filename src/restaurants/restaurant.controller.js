@@ -1,8 +1,10 @@
 import Restaurante from "../restaurants/restaurant.model.js";
+import Reservation from "../reservations/reservation.model.js";
+import Order from "../orders/order.model.js";
+import mongoose from "mongoose";
 
 export const createRestaurante = async (req, res) => {
   try {
-    console.log("BODY QUE LLEGA:", req.body);
 
     const restaurantData = req.body;
 
@@ -167,4 +169,98 @@ export const changeRestauranteStatus = async (req, res) => {
       error: error.message,
     });
   }
+};
+
+export const getActivity = async (req, res) => {
+    try {
+        const { id } = req.params; 
+
+        const [reservations, orders] = await Promise.all([
+            Reservation.find({ restaurant: id, isActive: true })
+                .populate('table', 'number location capacity') 
+                .sort({ reservationDate: 1 }),
+            Order.find({ restaurant: id })
+                .sort({ createdAt: -1 })
+                .limit(20) 
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            restaurantId: id,
+            activeReservations: reservations.map(res => ({
+                id: res._id,
+                fecha: res.reservationDate,
+                cliente: res.client,
+                personas: res.numberOfPeople,
+                mesa: res.table?.number || "N/A",
+                ubicacion: res.table?.location || "General",
+                estado: res.status
+            })),
+            recentOrders: orders.map(order => ({
+                id: order._id,
+                tipo: order.deliveryType, 
+                total: `Q${order.total.toFixed(2)}`,
+                estado: order.status,
+                hora: order.createdAt
+            }))
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Error al consultar la actividad en vivo",
+            error: error.message
+        });
+    }
+};
+
+export const getRestaurantClientsData = async (req, res) => {
+    try {
+        const { id } = req.params; 
+
+        const loyaltyStats = await Order.aggregate([
+            { 
+                $match: { 
+                    restaurant: new mongoose.Types.ObjectId(id),
+                    status: 'ENTREGADO' 
+                } 
+            },
+            
+            { 
+                $group: {
+                    _id: "$client", 
+                    totalOrders: { $sum: 1 },      
+                    totalSpent: { $sum: "$total" },    
+                    avgOrderValue: { $avg: "$total" }, 
+                    lastPurchase: { $max: "$createdAt" },
+                    // Guardamos los nombres de los platos pedidos
+                    recurringItems: { $push: "$items.name" } 
+                } 
+            },
+
+            { $sort: { totalOrders: -1 } },
+
+            { $limit: 10 }
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            restaurantId: id,
+            frequentCustomers: loyaltyStats.map(c => ({
+                customerUid: c._id,
+                orderCount: c.totalOrders,
+                totalRevenue: `Q${c.totalSpent.toFixed(2)}`,
+                averageTicket: `Q${c.avgOrderValue.toFixed(2)}`,
+                lastVisit: c.lastPurchase,
+                mostOrderedDishes: [...new Set(c.recurringItems.flat())].slice(0, 3)
+            }))
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Error al consultar datos de fidelidad del restaurante",
+            error: error.message
+        });
+    }
 };

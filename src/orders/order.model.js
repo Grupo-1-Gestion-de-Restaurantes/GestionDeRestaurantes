@@ -13,65 +13,57 @@ const orderSchema = new mongoose.Schema({
         ref: 'Restaurante',
         required: [true, "El restaurante es obligatorio"]
     },
+    deliveryType: {
+        type: String,
+        enum: {
+            values: ['DOMICILIO', 'RECOGER'],
+            message: "El tipo de entrega debe ser DOMICILIO o RECOGER"
+        },
+        required: [true, "El tipo de entrega es obligatorio"],
+        default: 'DOMICILIO'
+    },
     items: [{
         productId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Dish',
             required: [true, "El producto es obligatorio"]
         },
-        name: {
-            type: String,
-            required: [true, "El nombre del producto es obligatorio"]
-        },
-        price: {
-            type: Number,
-            required: [true, "El precio del producto es obligatorio"]
-        },
+        name: String,
+        price: Number,
         quantity: {
             type: Number,
-            required: [true, "La cantidad del producto es obligatoria"],
-            min: [1, "La cantidad debe ser al menos 1"]
+            required: true,
+            min: [1, "Mínimo 1"]
         },
-        subtotal: {
-            type: Number,
-            required: [true, "El subtotal del producto es obligatorio"],
-            min: [0, "El subtotal debe ser mayor o igual a 0"]
-        }
+        subtotal: Number
     }],
     total: {
         type: Number,
-        required: [true, "El total es obligatorio"],
+        required: true,
         default: 0
     },
     deliveryAddress: {
         alias: {
             type: String,
-            enum: ["Casa", "Trabajo", "Otro"],
+            enum: ["Casa", "Trabajo", "Otro", "N/A"],
             default: "Casa"
         },
         addressLine: {
             type: String,
-            required: [true, "La dirección es obligatoria"],
             trim: true
         },
-        houseNumber: {
-            type: String,
-            required: [true, "El número de casa es obligatorio"]
-        },
+        houseNumber: String,
         securityInfo: String,
         reference: String
     },
     status: {
         type: String,
-        enum: ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'EN_CAMINO', 'ENTREGADO', 'CANCELADO'],
+        enum: ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'EN_CAMINO', 'LISTO_PARA_RECOGER', 'ENTREGADO', 'CANCELADO'],
         default: 'PENDIENTE'
     },
     paymentMethod: {
         type: String,
-        enum: {
-            values: ['EFECTIVO', 'TARJETA'],
-            message: "El método de pago debe ser EFECTIVO o TARJETA"
-        },
+        enum: ['EFECTIVO', 'TARJETA'],
         required: [true, "El método de pago es obligatorio"]
     }
 }, { 

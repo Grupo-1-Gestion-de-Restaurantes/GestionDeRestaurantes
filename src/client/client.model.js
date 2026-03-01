@@ -12,13 +12,11 @@ const clientSchema = mongoose.Schema(
 
         name: {
             type: String,
-            required: [true, "El nombre es obligatorio"],
             trim: true
         },
 
         email: {
             type: String,
-            required: [true, "El correo electrónico es obligatorio"],
             unique: true,
             trim: true
         },

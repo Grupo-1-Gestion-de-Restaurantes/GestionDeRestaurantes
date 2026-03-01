@@ -40,12 +40,12 @@ const reservationSchema = new mongoose.Schema({
         trim: true
     },
     isActive: {
-      type: Boolean,
-      default: true
+        type: Boolean,
+        default: true
     },
-}, { 
+}, {
     timestamps: true,
-    versionKey: false 
+    versionKey: false
 });
 
 

@@ -5,6 +5,19 @@ export const createClient = async (req, res) => {
     try {
         const client = req.user; 
 
+        if (client.phone && client.birthdate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Este cliente ya completó su registro anteriormente.',
+                error: 'Información de cliente ya existe',
+            });
+        }
+
+        delete req.body.name;
+        delete req.body.email;
+        delete req.body.role;
+        delete req.body._id;
+
         client.set(req.body);
 
         if (req.body.address) {
@@ -15,14 +28,14 @@ export const createClient = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Cliente creado exitosamente',
+            message: 'Cliente registrado exitosamente',
             data: client
         });
 
     } catch (error) {
         res.status(400).json({
             success: false,
-            message: 'Error al crear cliente',
+            message: 'Error al registrar el cliente',
             error: error.message
         });
     }
@@ -94,6 +107,8 @@ export const getClientById = async (req, res) => {
         });
     }
 };
+
+
 
 export const updateClient = async (req, res) => {
     try {
@@ -199,6 +214,31 @@ export const changeClientStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al cambiar el estado del cliente',
+            error: error.message,
+        });
+    }
+};
+
+export const getMyInfo = async (req, res) => {
+    try {
+        const client = req.user;
+
+        if (!client) {
+            return res.status(404).json({
+                success: false,
+                message: 'Información de perfil no encontrada',
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Perfil obtenido exitosamente',
+            data: client
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener tu información',
             error: error.message,
         });
     }

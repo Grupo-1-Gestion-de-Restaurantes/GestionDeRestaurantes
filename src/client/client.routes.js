@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { createClient, getClients , getClientById, updateClient, addAddressToClient, changeClientStatus } from './client.controller.js';
-import { validateGetClients, validateCreateClient, validateClientById,validateUpdateClientRequest, validateAddAddressToClient, validateClientStatusChange } from '../../middlewares/client-validators.js';
+import { createClient, getClients , getClientById, updateClient, addAddressToClient, changeClientStatus, getMyInfo } from './client.controller.js';
+import { validateGetClients, validateCreateClient, validateClientById,validateUpdateClientRequest, validateAddAddressToClient, validateClientStatusChange, validateGetMyInfo } from '../../middlewares/client-validators.js';
 
 const router = Router();
 
@@ -15,6 +15,8 @@ router.get(
     validateGetClients,
     getClients
 )
+
+router.get('/myInfo', validateGetMyInfo, getMyInfo);
 
 router.get('/:id', validateClientById, getClientById);
 
@@ -31,5 +33,6 @@ router.put(
 
 router.put('/:id/activate', validateClientStatusChange, changeClientStatus);
 router.put('/:id/deactivate', validateClientStatusChange, changeClientStatus);
+
 
 export default router;

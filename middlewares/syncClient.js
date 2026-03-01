@@ -2,17 +2,21 @@ import Client from '../src/client/client.model.js';
 
 export const syncClient = async (req, res, next) => {
     try {
-        const { id } = req.user; 
+        const { id, name, email } = req.user; 
 
         const user = await Client.findOneAndUpdate(
             { _id: id },
             { 
+                $set: { 
+                    name: name,
+                    email: email
+                },
                 $setOnInsert: { 
                     _id: id, 
                     isActive: true
                 } 
             },
-            { upsert: true, new: true }
+            { upsert: true, new: true, runValidators: false } 
         );
 
         req.user = user;
@@ -20,7 +24,7 @@ export const syncClient = async (req, res, next) => {
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: "Error en la sincronización del cliente",
+            message: "Error en la sincronización",
             error: error.message
         });
     }

@@ -1,7 +1,9 @@
 import Order from "./order.model.js";
 import Dish from "../dishes/dish.model.js";
-import Restaurante from "../restaurants/restaurant.model.js";
+import Restaurant from "../restaurants/restaurant.model.js";
 import Invoice from "../invoice/invoice.model.js";
+import { generatePDFBuffer } from "../invoice/invoice.controller.js";
+import { sendInvoiceEmail } from "../../helpers/email-service.js";
 import InventoryItem from "../inventories/inventory.model.js";
 import Promotion from "../promotions/promotions.model.js";
 
@@ -10,6 +12,11 @@ export const createOrder = async (req, res) => {
         const { restaurantId, items, addressId, paymentMethod, promotion } = req.body;
         const client = req.user;
         const stockDeductions = [];
+
+        const restaurant = await Restaurant.findById(restaurantId);
+        if (!restaurant) {
+            return res.status(404).json({ success: false, message: "Restaurante no encontrado" });
+        }
 
         const selectedAddress = addressId
             ? client.addresses.id(addressId)
@@ -120,6 +127,7 @@ export const createOrder = async (req, res) => {
             client: client.uid || client._id,
             clientName: client.name,
             restaurant: restaurantId,
+            restaurantName: restaurant.name,
             items: hydratedItems.map(i => ({
                 name: i.name,
                 quantity: i.quantity,
@@ -130,11 +138,22 @@ export const createOrder = async (req, res) => {
             paymentMethod
         });
 
+        
+
         const savedInvoice = await newInvoice.save();
+
+        console.log("Factura guardada con nombre:", savedInvoice.restaurantName);
+
+        generatePDFBuffer(savedInvoice)
+            .then(pdfBuffer => {
+                return sendInvoiceEmail(client.email, pdfBuffer, savedInvoice.invoiceNumber);
+            })
+            .then(() => console.log(`Factura enviada a ${client.email}`))
+            .catch(err => console.error("Error crítico enviando factura:", err));
 
         res.status(201).json({
             success: true,
-            message: "Pedido y Factura creados correctamente",
+            message: "Pedido y Factura creados correctamente: Se ha enviado un correo con la factura adjunta",
             order: savedOrder,
             invoice: savedInvoice
         });
