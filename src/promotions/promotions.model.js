@@ -46,10 +46,18 @@ const promotionSchema = new mongoose.Schema({
         type: Date,
         required: [true, 'La fecha de fin de la promoción es obligatoria']
     },
+    status: {
+        type: String,
+        enum: {
+            values: ['PENDING', 'APPROVED', 'REJECTED'],
+            message: 'El estado de la promoción debe ser PENDING, APPROVED o REJECTED'
+        },
+        default: 'PENDING'
+    },
     isActive: {
         type: Boolean,
         default: true
-    },
+    }
 
 }, { timestamps: true, versionKey: false });
 
