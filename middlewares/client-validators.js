@@ -39,6 +39,7 @@ export const validateCreateClient = [
 
 export const validateUpdateClientRequest = [
     validateJWT,
+    requireRole('ADMIN_ROLE', 'CLIENT_ROLE'),
     syncClient,
     body('name')
         .optional()
