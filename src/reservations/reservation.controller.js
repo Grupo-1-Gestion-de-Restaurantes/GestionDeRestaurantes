@@ -1,4 +1,6 @@
 import Reservation from "./reservation.model.js";
+import '../restaurants/restaurant.model.js';
+import '../table/table.model.js';
 
 export const createReservation = async (req, res) => {
     try {
@@ -154,4 +156,33 @@ export const changeReservationStatus = async (req, res) => {
             error: error.message,
         });
     }
+};
+
+export const getMyReservations = async (req, res) => {
+  try {
+
+    const userId = req.user.id; // viene del JWT
+
+    const reservations = await Reservation.find({
+      client: userId,
+      isActive: true
+    })
+    .populate('restaurant', 'name')
+    .populate('table', 'number')
+    .sort({ reservationDate: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: 'Mis reservaciones obtenidas exitosamente',
+      total: reservations.length,
+      data: reservations
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener mis reservaciones',
+      error: error.message
+    });
+  }
 };

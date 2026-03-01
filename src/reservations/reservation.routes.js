@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { changeReservationStatus, createReservation, getReservationById, getReservations, updateReservation } from './reservation.controller.js';
+import { validateJWT } from "../../middlewares/validate-JWT.js"
+import { changeReservationStatus, createReservation, getReservationById, getReservations, updateReservation, getMyReservations } from './reservation.controller.js';
 const router = Router();
 
 router.post(
@@ -11,6 +12,12 @@ router.get(
     '/get',
     getReservations
 )
+
+router.get(
+  '/my-reservations',
+  validateJWT,
+  getMyReservations
+);
 
 router.get('/:id', getReservationById);
 
