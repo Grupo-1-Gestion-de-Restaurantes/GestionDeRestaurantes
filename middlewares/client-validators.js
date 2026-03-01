@@ -10,9 +10,12 @@ export const validateCreateClient = [
     syncClient,
     body('name')
         .trim()
-        .notEmpty().withMessage('El nombre es obligatorio'),
+        .optional()
+        .notEmpty()
+        .withMessage('El nombre no puede estar vacío'),
     body('email')
         .trim()
+        .optional()
         .isEmail().withMessage('Debe ser un correo electrónico válido'),
     body('phone')
         .trim()
@@ -104,3 +107,9 @@ export const validateClientById = [
         .isString().withMessage('El ID debe ser una cadena de texto'),
     checkValidators,
 ];
+
+export const validateGetMyInfo = [
+    validateJWT,
+    syncClient,
+    checkValidators,
+]

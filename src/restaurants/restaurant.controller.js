@@ -5,7 +5,6 @@ import mongoose from "mongoose";
 
 export const createRestaurante = async (req, res) => {
   try {
-    console.log("BODY QUE LLEGA:", req.body);
 
     const restaurantData = req.body;
 
