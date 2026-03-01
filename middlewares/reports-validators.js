@@ -55,6 +55,16 @@ export const getRestaurantActivityReport = [
     checkValidators,
 ];
 
+export const getRestaurantClientsReport = [
+    validateJWT,
+    requireRole('MANAGER_ROLE'),
+    param('id')
+        .isMongoId()
+        .withMessage('ID de restaurante no válido'),
+    validateRestaurantAdmin,
+    checkValidators,
+];
+
 export const validateGetRestaurantReport = [
     validateJWT,
     requireRole('MANAGER_ROLE'),
