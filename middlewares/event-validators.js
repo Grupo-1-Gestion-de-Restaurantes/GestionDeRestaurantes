@@ -3,6 +3,8 @@ import { checkValidators } from './checkValidators.js';
 import { validateJWT } from './validate-JWT.js';
 import { requireRole } from './validate-role.js';
 import Restaurante from '../src/restaurants/restaurant.model.js'
+import e from 'express';
+import { validate } from 'uuid';
 
 export const validateCreateEvent = [
     validateJWT,
@@ -45,6 +47,22 @@ export const validateCreateEvent = [
             }
             return true;
         }),
+    body('promotion')
+        .optional()
+        .isMongoId()
+        .withMessage('El ID de la promoción debe ser un ObjectId válido de MongoDB')
+        .custom(async (value) => {
+            const promotionDB = await Promotion.findById(value);
+            if (!promotionDB) {
+                throw new Error('La promoción no existe');
+            }
+            return true;
+        }),
+    body('price')
+        .notEmpty()
+        .withMessage('El precio del evento es obligatorio')
+        .isFloat({ min: 0 })
+        .withMessage('El precio debe ser un número positivo'),
     body('restaurant')
         .trim()
         .isMongoId()
@@ -59,8 +77,7 @@ export const validateCreateEvent = [
 
 export const validateUpdateEventRequest = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
-    requireRole('MANAGER_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     body('name')
         .trim()
         .notEmpty()
@@ -83,8 +100,15 @@ export const validateUpdateEventRequest = [
         .trim()
         .isLength({ min: 1 })
         .withMessage('La capacidad debe ser mayor a 1 y no puede exceder la capacidad del restaurante'),
+    body('price')
+        .notEmpty()
+        .withMessage('El precio del evento es obligatorio')
+        .isFloat({ min: 0 })
+        .withMessage('El precio debe ser un número positivo'),
     body('restaurant')
         .trim()
+        .isMongoId()
+        .withMessage('El ID del restaurante debe ser un MongoID valido')
         .notEmpty()
         .withMessage('El ID del restaurante es obligatorio'),
     body('dateTime')
@@ -93,7 +117,7 @@ export const validateUpdateEventRequest = [
     checkValidators,
 ];
 
-// Validaciones para activar/desactivar restaurantes
+// Validaciones para activar/desactivar eventos
 export const validateRestaurantStatusChange = [
     validateJWT,
     requireRole('ADMIN_ROLE'),
@@ -104,10 +128,40 @@ export const validateRestaurantStatusChange = [
     checkValidators,
 ];
 
-// Validación para obtener restaurante por ID
-export const validateGetRestaurantdById = [
+// Validación para obtener eventos por ID
+export const validateGetEventById = [
     param('id')
         .isMongoId()
         .withMessage('ID debe ser un ObjectId válido de MongoDB'),
+    checkValidators,
+];
+
+export const validateSuscribeToEvent = [
+    validateJWT,
+    requireRole('CLIENT_ROLE'),
+    param('id')
+        .isMongoId()
+        .withMessage('ID debe ser un ObjectId válido de MongoDB'),
+    body('promotionId')
+        .optional()
+        .isMongoId()
+        .withMessage('El ID de la promoción debe ser un ObjectId válido de MongoDB'),
+    checkValidators,
+];
+
+export const validateGetEvents = [
+    validateJWT,
+    body('page')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('La página debe ser un número entero mayor a 0'),
+    body('limit')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('El límite debe ser un número entero mayor a 0'),
+    body('isActive')
+        .optional()
+        .isBoolean()
+        .withMessage('isActive debe ser un valor booleano'),
     checkValidators,
 ];

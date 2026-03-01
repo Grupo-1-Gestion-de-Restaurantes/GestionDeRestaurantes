@@ -43,6 +43,11 @@ export const validateCreateEmployee = [
         .withMessage('El teléfono es requerido')
         .matches(/^\d{8}$/)
         .withMessage('El teléfono debe tener exactamente 8 dígitos'),
+    body('role')
+        .notEmpty()
+        .withMessage('el role es requerido')
+        .isIn(['EMPLOYEE_ROLE', 'MANAGER_ROLE'])
+        .withMessage('El role debe ser EMPLOYEE_ROLE o MANAGER_ROLE'),
     body('restaurant')
         .trim()
         .notEmpty()
