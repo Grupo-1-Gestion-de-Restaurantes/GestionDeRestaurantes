@@ -1,34 +1,44 @@
-import {Router} from 'express';
-import {getPromotion,getPromotionById, createPromotion, updatePromotion, changePromotionStatus} from './promotions.controller.js';
+import { Router } from 'express';
+import { validateCreatePromotion, validateGetPromotionById, validateUpdatePromotion, validateUpdatePromotionStatus, validateChangePromotionStatus, validateGetPromotion } from '../../middlewares/promotions-validators.js';
+import { getPromotion, getPromotionById, createPromotion, updatePromotion, changePromotionStatus, updatePromotionStatus } from './promotions.controller.js';
 
 
 const router = Router();
 
 router.post(
-'/create',
-createPromotion
+    '/create',
+    validateCreatePromotion,
+    createPromotion
 );
 
 router.get(
-'/get',
-getPromotion
+    '/get',
+    validateGetPromotion,
+    getPromotion
 );
 
 router.get(
-'/:id',
-getPromotionById
+    '/:id',
+    validateGetPromotionById,
+    getPromotionById
 );
 
 
 router.put(
-'/:id',
-updatePromotion
+    '/:id',
+    validateUpdatePromotion,
+    updatePromotion
 );
 
+router.patch('/status/:id', 
+    validateUpdatePromotionStatus,
+    updatePromotionStatus);
 
 
-router.put('/:id/activate', changePromotionStatus);
-router.put('/:id/deactivate', changePromotionStatus);
+router.put('/:id/activate', 
+    validateChangePromotionStatus,
+    changePromotionStatus);
+router.put('/:id/desactivate', validateChangePromotionStatus, changePromotionStatus);
 
 
 export default router;

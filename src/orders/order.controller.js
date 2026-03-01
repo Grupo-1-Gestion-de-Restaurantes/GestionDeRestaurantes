@@ -4,11 +4,14 @@ import Restaurant from "../restaurants/restaurant.model.js";
 import Invoice from "../invoice/invoice.model.js";
 import { generatePDFBuffer } from "../invoice/invoice.controller.js";
 import { sendInvoiceEmail } from "../../helpers/email-service.js";
+import InventoryItem from "../inventories/inventory.model.js";
+import Promotion from "../promotions/promotions.model.js";
 
 export const createOrder = async (req, res) => {
     try {
-        const { restaurantId, items, addressId, paymentMethod } = req.body;
+        const { restaurantId, items, addressId, paymentMethod, promotion } = req.body;
         const client = req.user;
+        const stockDeductions = [];
 
         const restaurant = await Restaurant.findById(restaurantId);
         if (!restaurant) {
@@ -26,19 +29,56 @@ export const createOrder = async (req, res) => {
             });
         }
 
+        let activePromo = null;
+        if (promotion) {
+            activePromo = await Promotion.findOne({
+                _id: promotion,
+                restaurant: restaurantId,
+                isActive: true,
+                status: 'APPROVED',
+                scope: { $in: ['PEDIDOS', 'GENERAL'] },
+                startDate: { $lte: new Date() },
+                endDate: { $gte: new Date() }
+            });
+
+            if (!activePromo) throw new Error("La promoción no es válida o ha expirado");
+        }
+
         let totalOrder = 0;
+
         const hydratedItems = await Promise.all(items.map(async (item) => {
             const dish = await Dish.findOne({
                 _id: item.dishId,
                 restaurant: restaurantId,
                 isActive: true
-            });
+            }).populate('ingredients.inventoryItem');
 
             if (!dish) {
                 throw new Error(`El plato ${item.dishId} no está disponible o no pertenece a este restaurante`);
             }
+            let subtotal = dish.price * item.quantity;
 
-            const subtotal = dish.price * item.quantity;
+            // Validación de inventario
+            for (const ingredient of dish.ingredients) {
+                const totalNeeded = ingredient.quantityUsed * item.quantity;
+                const currentStock = ingredient.inventoryItem.quantity;
+
+                if (currentStock < totalNeeded) {
+                    throw new Error(`No hay suficiente stock de ${ingredient.inventoryItem.name} para preparar ${item.quantity} unidades de ${dish.name}`);
+                }
+
+                // Guardar en memoria lo que se va a descontar
+                stockDeductions.push({
+                    inventoryItemId: ingredient.inventoryItem._id,
+                    amountToDeduct: totalNeeded
+                });
+            }
+
+            if (activePromo && activePromo.dishesApplicables.includes(dish._id)) {
+                const discount = subtotal * (activePromo.discountPercentage / 100);
+                subtotal -= discount;
+            }
+
             totalOrder += subtotal;
 
             return {
@@ -49,6 +89,18 @@ export const createOrder = async (req, res) => {
                 subtotal: subtotal
             };
         }));
+
+        // Descontar del inventario
+        if (stockDeductions.length > 0) {
+            const bulkOps = stockDeductions.map(deduction => ({
+                updateOne: {
+                    filter: { _id: deduction.inventoryItemId },
+                    update: { $inc: { quantity: -deduction.amountToDeduct } }
+                }
+            }));
+
+            await InventoryItem.bulkWrite(bulkOps);
+        }
 
         const newOrder = new Order({
             client: client.uid || client._id,
@@ -71,7 +123,7 @@ export const createOrder = async (req, res) => {
 
         const newInvoice = new Invoice({
             invoiceNumber,
-            order: savedOrder._id, 
+            order: savedOrder._id,
             client: client.uid || client._id,
             clientName: client.name,
             restaurant: restaurantId,
@@ -147,7 +199,7 @@ export const getOrderById = async (req, res) => {
         const order = await Order.findById(id)
             .populate('restaurant', 'name photo address phone')
             .populate('items.productId', 'name photo')
-            .populate('client', 'name email') 
+            .populate('client', 'name email')
             .lean();
 
         if (!order) {

@@ -2,7 +2,6 @@ import Promotions from "./promotions.model.js";
 
 export const createPromotion = async (req, res) => {
     try {
-        console.log("BODY QUE LLEGA", req.body);
         const promotionData = req.body;
         const promotions = new Promotions(promotionData);
         await promotions.save();
@@ -82,6 +81,7 @@ export const getPromotionById = async (req, res) => {
         });
     }
 };
+
 export const updatePromotion = async (req, res) => {
     try {
         const { id } = req.params;
@@ -93,13 +93,13 @@ export const updatePromotion = async (req, res) => {
                 message: 'Promoción no encontrada'
             });
         }
- const updateData = { ...req.body };
+        const updateData = { ...req.body };
 
         const updatedPromotion = await Promotions.findByIdAndUpdate(id, updateData, {
             new: true,
             runValidators: true
-
         });
+        
         res.status(200).json({
             success: true,
             message: 'Promoción actualizada con éxito',
@@ -116,33 +116,71 @@ export const updatePromotion = async (req, res) => {
 
 export const changePromotionStatus = async (req, res) => {
     try {
-            const { id } = req.params;
-            const isActive = req.url.includes('/activate');
-            const action = isActive ? 'activada' : 'desactivada';
-    
-            const table = await Promotions.findByIdAndUpdate(
-                id,
-                { isActive },
-                { new: true }
-            );
-    
-            if (!table) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Promoción no encontrada',
-                });
-            }
-    
-            res.status(200).json({
-                success: true,
-                message: `Promoción ${action} exitosamente`,
-                data: table,
-            });
-        } catch (error) {
-            res.status(500).json({
+        const { id } = req.params;
+        const isActive = req.url.includes('/activate');
+        const action = isActive ? 'activada' : 'desactivada';
+
+        const table = await Promotions.findByIdAndUpdate(
+            id,
+            { isActive },
+            { new: true }
+        );
+
+        if (!table) {
+            return res.status(404).json({
                 success: false,
-                message: 'Error al cambiar el estado de la promoción',
-                error: error.message,
+                message: 'Promoción no encontrada',
             });
         }
+
+        res.status(200).json({
+            success: true,
+            message: `Promoción ${action} exitosamente`,
+            data: table,
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al cambiar el estado de la promoción',
+            error: error.message,
+        });
+    }
+};
+
+export const updatePromotionStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body; 
+
+        const validStatuses = ['APPROVED', 'REJECTED'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Estado inválido. Use APPROVED o REJECTED' 
+            });
+        }
+
+        const promo = await Promotions.findByIdAndUpdate(
+            id,
+            { status },
+            { new: true, runValidators: true }
+        );
+
+        if (!promo) {
+            return res.status(404).json({ success: false, message: 'Promoción no encontrada' });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `La promoción ha sido ${status === 'APPROVED' ? 'aprobada' : 'rechazada'} exitosamente`,
+            data: promo
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al cambiar el estado de la promoción',
+            error: error.message
+        });
+    }
 };

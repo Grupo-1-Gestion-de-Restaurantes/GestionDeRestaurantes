@@ -29,7 +29,9 @@ export const validateCreateOrder = [
     body('items.*.quantity')
         .notEmpty().withMessage('La cantidad es obligatoria')
         .isInt({ min: 1 }).withMessage('La cantidad mínima debe ser 1'),
-
+    body('promotion')
+        .optional()
+        .isMongoId().withMessage('El ID de promoción debe ser un ID válido de MongoDB'),
     checkValidators
 ];
 
