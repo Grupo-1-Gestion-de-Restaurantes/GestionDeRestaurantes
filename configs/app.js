@@ -25,7 +25,8 @@ import inventoryRoutes from '../src/inventories/inventory.routes.js';
 import commentRoutes from '../src/comments/comment.routes.js';
 import notificationRoutes from '../src/notifications/notification.routes.js';
 import { initializeSocket } from '../src/notifications/notification.service.js';
-
+import swaggerUi from 'swagger-ui-express';
+import { swaggerDocument } from './swagger.js';
 const BASE_PATH = '/gestionDeRestaurantes/v1';
 
 const middlewares = (app) => {
@@ -35,6 +36,7 @@ const middlewares = (app) => {
     app.use(helmet(helmetConfiguration));
     app.use(requestLimit);
     app.use(morgan('dev'));
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 }
 
 const routes = (app) => {
