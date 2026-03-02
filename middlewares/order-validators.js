@@ -6,6 +6,7 @@ import { requireRole } from './validate-role.js';
 
 export const validateCreateOrder = [
     validateJWT,
+    requireRole('CLIENT_ROLE'),
     syncClient,
     body('restaurantId')
         .notEmpty().withMessage('El ID del restaurante es obligatorio')
@@ -14,10 +15,6 @@ export const validateCreateOrder = [
     body('paymentMethod')
         .notEmpty().withMessage('El método de pago es obligatorio')
         .isIn(['EFECTIVO', 'TARJETA']).withMessage('Método de pago debe ser EFECTIVO o TARJETA'),
-
-    body('tableId')
-        .notEmpty().withMessage('El ID de la mesa es obligatorio')
-        .isMongoId().withMessage('El ID de la mesa debe ser un ID válido de MongoDB'),
 
     body('items')
         .isArray({ min: 1 }).withMessage('El pedido debe contener al menos un plato'),
@@ -53,14 +50,14 @@ export const validateGetMyOrders = [
 
 export const validateGetOrderById = [
     validateJWT,
-    syncClient,
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE', 'EMPLOYEE_ROLE'),
     param('id').isMongoId().withMessage('ID de pedido no válido'),
     checkValidators
 ];
 
 export const validateUpdateStatus = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE', 'EMPLOYEE_ROLE'),
     param('id').isMongoId().withMessage('ID de pedido no válido'),
     body('status')
         .notEmpty().withMessage('El estado es obligatorio')

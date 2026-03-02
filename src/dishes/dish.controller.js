@@ -1,9 +1,25 @@
 import Dish from './dish.model.js';
+import Restaurant from '../restaurants/restaurant.model.js';
 
 export const createDish = async (req, res) => {
     try {
 
         const dishData = req.body;
+
+        if (!dishData.restaurant) {
+            return res.status(400).json({
+                success: false,
+                message: 'El ID del restaurante es requerido para crear un platillo'
+            });
+        }
+
+        const restaurantExists = await Restaurant.findById(dishData.restaurant);
+        if (!restaurantExists) {
+            return res.status(404).json({
+                success: false,
+                message: 'El restaurante proporcionado no existe'
+            });
+        }
         if (req.file){
             dishData.photo = req.file.path;
         }

@@ -20,20 +20,10 @@ router.post("/create",
   uploadFieldImage.single('image'),
   cleanUploaderFileOnFinish,
   validateCreateRestaurant,
-  createRestaurante);
+  createRestaurante
+);
 
 router.get("/get", getRestaurantes);
-
-router.get("/:id", validateGetRestaurantdById, getRestauranteById);
-
-router.put("/:id",
-  uploadFieldImage.single('image'),
-  cleanUploaderFileOnFinish,
-  validateUpdateRetaurantRequest,
-  updateRestaurante);
-
-router.delete("/:id", validateRestaurantStatusChange, changeRestauranteStatus);
-
 
 router.get(
   '/:id',
@@ -46,5 +36,18 @@ router.get(
   getRestaurantClientsReport,
   getRestaurantClientsData
 );
+
+router.get("/:id", validateGetRestaurantdById, getRestauranteById);
+
+router.put("/:id",
+  uploadFieldImage.single('image'),
+  cleanUploaderFileOnFinish,
+  validateUpdateRetaurantRequest,
+  updateRestaurante);
+
+router.delete("/:id", validateRestaurantStatusChange, changeRestauranteStatus);
+
+
+
 
 export default router;

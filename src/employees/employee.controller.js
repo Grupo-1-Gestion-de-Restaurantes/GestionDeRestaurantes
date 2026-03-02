@@ -1,4 +1,5 @@
 import Employee from './employee.model.js';
+import Restaurant from '../restaurants/restaurant.model.js';
 
 const sendRollbackError = async (userId, req) => {
     console.warn(`[ROLLBACK PENDIENTE] El usuario ${userId} fue creado en AuthService pero falló el registro del empleado. Eliminarlo manualmente si es necesario.`);
@@ -9,6 +10,21 @@ export const createEmployee = async (req, res) => {
 
     try {
         const employeeData = req.body;
+
+        if (!employeeData.restaurant) {
+            return res.status(400).json({
+                success: false,
+                message: 'El ID del restaurante es obligatorio'
+            });
+        }
+
+        const restaurantExists = await Restaurant.findById(employeeData.restaurant);
+        if (!restaurantExists) {
+            return res.status(404).json({
+                success: false,
+                message: 'El restaurante proporcionado no existe'
+            });
+        }
 
         const formData = new FormData();
         formData.append('name', employeeData.name);

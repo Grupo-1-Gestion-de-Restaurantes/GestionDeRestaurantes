@@ -1,4 +1,6 @@
 import Reservation from './reservation.model.js';
+import Restaurant from '../restaurants/restaurant.model.js';
+import Table from '../table/table.model.js';
 import { notificationService } from '../notifications/notification.service.js';
 
 export const createReservation = async (req, res) => {
@@ -164,7 +166,7 @@ export const changeReservationStatus = async (req, res) => {
             { new: true }
         );
 
-        if (!res) {
+        if (!reservation) { 
             return res.status(404).json({
                 success: false,
                 message: 'Reservación no encontrada',

@@ -7,7 +7,7 @@ export const syncClient = async (req, res, next) => {
                 success: false,
                 message: "ID de usuario no disponible"
             });
-
+        }
         const { id, name, email } = req.user; 
 
         const user = await Client.findOneAndUpdate(

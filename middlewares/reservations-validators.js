@@ -3,14 +3,22 @@ import { checkValidators } from './checkValidators.js';
 import { validateJWT } from './validate-JWT.js';
 import { syncClient } from './syncClient.js';
 import { requireRole } from './validate-role.js';
+import Reservation from '../src/reservations/reservation.model.js';
+import Restaurant from '../src/restaurants/restaurant.model.js';
 
-// Validación para crear una reservación
 export const validateCreateReservation = [
     validateJWT,
-    syncClient, // Asegura que el cliente que reserva exista en nuestra DB local
-    body('restaurantId')
+    syncClient, 
+    body('restaurant')
         .notEmpty().withMessage('El ID del restaurante es obligatorio')
-        .isMongoId().withMessage('ID de restaurante inválido'),
+        .isMongoId().withMessage('ID de restaurante inválido')
+        .custom(async (value) => {
+            const restaurantExists = await Restaurant.findById(value);
+            if (!restaurantExists) {
+                throw new Error('El restaurante seleccionado no existe en nuestra base de datos');
+            }
+            return true;
+        }),
     body('reservationDate')
         .notEmpty().withMessage('La fecha de reservación es obligatoria')
         .isISO8601().withMessage('Formato de fecha inválido')
@@ -46,14 +54,25 @@ export const validateUpdateReservation = [
 // Listar reservaciones (Generalmente solo para ADMIN)
 export const validateGetReservations = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     checkValidators
 ];
 
 // Obtener por ID o Cambiar estado
 export const validateReservationId = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     param('id').isMongoId().withMessage('ID de reservación inválido'),
+    checkValidators
+];
+
+export const validateChangeReservationStatus = [
+    validateJWT,
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
+    param('id').isMongoId().withMessage('ID de reservación inválido'),
+    body('status')
+        .notEmpty().withMessage('El estado es obligatorio')
+        .isIn(['PENDIENTE', 'CONFIRMADA', 'COMPLETADA', 'CANCELADA', 'NO_ASISTIO'])
+        .withMessage('Estado inválido'),
     checkValidators
 ];

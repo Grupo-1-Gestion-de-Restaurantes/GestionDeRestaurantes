@@ -12,7 +12,8 @@ const tableSchema = mongoose.Schema(
             type: String,
             required: [true, 'El número de mesa es requerido'],
             trim: true,
-            maxLength: [50, 'El número de mesa no puede exceder 50 caracteres']
+            maxLength: [50, 'El número de mesa no puede exceder 50 caracteres'],
+            unique: [true, 'Ya existe una mesa con este número en el restaurante'] 
         },
         capacity: {
             type: Number,

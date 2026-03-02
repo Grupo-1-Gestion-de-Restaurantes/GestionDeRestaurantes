@@ -192,3 +192,48 @@ export const changeTableAvailability = async (req, res) => {
         });
     }
 };
+
+export const getTablesByRestaurant = async (req, res) => {
+    try {
+        const { restaurantId } = req.params;
+        const { page = 1, limit = 10, isActive = true } = req.query;
+
+        const restaurantExists = await Restaurant.findById(restaurantId);
+        if (!restaurantExists) {
+            return res.status(404).json({
+                success: false,
+                message: 'El restaurante proporcionado no existe'
+            });
+        }
+
+        const filter = { restaurant: restaurantId, isActive };
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const [tables, total] = await Promise.all([
+            Table.find(filter)
+                .populate('restaurant', 'name')
+                .limit(parseInt(limit))
+                .skip(skip)
+                .sort({ tableNumber: 1 }), 
+            Table.countDocuments(filter)
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: tables,
+            pagination: {
+                totalRecords: total,
+                totalPages: Math.ceil(total / limit),
+                currentPage: parseInt(page),
+                limit: parseInt(limit)
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener las mesas del restaurante',
+            error: error.message
+        });
+    }
+};

@@ -1,4 +1,5 @@
 import Inventory from './inventory.model.js';
+import Employee from '../employees/employee.model.js';
 
 export const createInventoryItem = async (req, res) => {
     try {

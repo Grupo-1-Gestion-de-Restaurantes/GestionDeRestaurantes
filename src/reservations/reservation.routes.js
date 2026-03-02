@@ -5,6 +5,7 @@ import {
     validateCreateReservation, 
     validateGetReservations, 
     validateUpdateReservation, 
+    validateChangeReservationStatus,
     validateReservationId 
 } from '../../middlewares/reservations-validators.js';
 
@@ -28,7 +29,7 @@ router.get(
   getMyReservations
 );
 
-router.get('/:id', getReservationById);
+router.get(
     '/:id', 
     validateReservationId, 
     getReservationById
@@ -39,6 +40,13 @@ router.put(
     validateUpdateReservation,
     updateReservation
 );
+
+router.put(
+    '/status/:id',
+    validateChangeReservationStatus,
+    updateReservation
+);
+
 
 router.put(
     '/:id/activate', 

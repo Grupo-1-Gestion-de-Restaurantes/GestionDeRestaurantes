@@ -1,11 +1,11 @@
     import { Router } from 'express';
-    import {  changeTableStatus, createTable, getTableById, getTables,  updateTable,changeTableAvailability } from './table.controller.js';
-    import { validateCreateTable, validateTableStatusChange, validateGetTableById, validateUpdateTableRequest,validateTableAvailabilityChange} from '../../middlewares/table-validators.js';
+    import {  changeTableStatus, createTable, getTableById, getTables,  updateTable,changeTableAvailability, getTablesByRestaurant } from './table.controller.js';
+    import { validateCreateTable, validateTableStatusChange, validateGetTableById, validateUpdateTableRequest,validateTableAvailabilityChange, validateGetTablesByRestaurant, validateGetTables} from '../../middlewares/table-validators.js';
 
 
     const router = Router();
 
-
+    router.get('/restaurant/:restaurantId', validateGetTablesByRestaurant, getTablesByRestaurant);
     router.post(
         '/create',
         validateCreateTable,
@@ -14,6 +14,7 @@
 
     router.get(
         '/get',
+        validateGetTables,
         getTables
     );
 
