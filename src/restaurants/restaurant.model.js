@@ -1,6 +1,8 @@
-import { Schema, model } from "mongoose";
+'use strict';
 
-const restaurantSchema = new Schema(
+import mongoose from "mongoose";
+
+const restaurantSchema = mongoose.Schema(
   {
     name: {
       type: String,
@@ -65,7 +67,7 @@ const restaurantSchema = new Schema(
       default: "Abierto",
     },
 
-    asset: {
+    isActive: {
       type: Boolean,
       default: true
     },
@@ -75,11 +77,17 @@ const restaurantSchema = new Schema(
       min: [1, "El rating mínimo es 1"],
       max: [5, "El rating máximo es 5"],
       default: 5
+    },
+
+    capacity: {
+      type: Number,
+      min: [1, "La capacidad no puede ser menor a 1"]
     }
   },
   {
-    timestamps: true
+    timestamps: true,
+    versionKey: false
   }
 );
 
-export default model("Restaurante", restaurantSchema);
+export default mongoose.model('Restaurante', restaurantSchema);
