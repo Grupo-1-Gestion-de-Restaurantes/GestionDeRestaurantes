@@ -4,9 +4,49 @@ dotenv.config();
 export const swaggerDocument = {
     openapi: '3.0.0',
     info: {
-        title: 'Gestión de Restaurantes',
+        title: 'Sistema de Gestión de Restaurantes - API REST',
         version: '1.0.0',
-        description: 'Documentación oficial del Server para el Sistema de Gestión de Restaurantes del Grupo 1. Gestiona todos los módulos operativos del restaurante.',
+        description: `
+## Descripción General
+
+Esta es la documentación oficial de la API REST para el **Sistema de Gestión de Restaurantes** desarrollado por el Grupo 1. El sistema proporciona una solución integral para la administración completa de restaurantes, cubriendo todos los aspectos operativos desde la gestión de mesas y reservaciones hasta la facturación y reportes.
+
+## Módulos Disponibles
+
+La API está organizada en los siguientes módulos:
+
+| Módulo | Descripción |
+|--------|-------------|
+| Restaurantes | Gestión de sucursales, configuración y parámetros operativos |
+| Mesas | Administración de mesas, capacidad y disponibilidad |
+| Clientes | Perfiles de clientes, direcciones e historial |
+| Reservaciones | Sistema de reservaciones con validación de disponibilidad |
+| Platillos | Menú digital con categorías, precios e imágenes |
+| Empleados | Gestión de personal por especialidades y roles |
+| Eventos | Programación de eventos especiales y capacidades |
+| Órdenes | Sistema de pedidos para mesa y domicilio |
+| Facturación | Generación y consulta de facturas electrónicas |
+| Promociones | Descuentos y ofertas promocionales |
+| Inventarios | Control de insumos y alertas de stock |
+| Comentarios | Reseñas y calificaciones de clientes |
+| Notificaciones | Sistema de notificaciones en tiempo real |
+| Reportes | Estadísticas y métricas del negocio |
+
+## Autenticación
+
+Todos los endpoints requieren autenticación mediante **token JWT** proporcionado por el AuthService de .NET. El token debe enviarse en el header Authorization con el formato:
+
+\`\`\`
+Authorization: Bearer <tu_token_jwt>
+\`\`\`
+
+## Tecnologías
+
+- **Backend:** Node.js con Express
+- **Base de Datos:** MongoDB con Mongoose
+- **Autenticación:** JWT vía AuthService externo (.NET)
+- **Almacenamiento de Imágenes:** Cloudinary
+        `
     },
     servers: [
         {
@@ -21,6 +61,318 @@ export const swaggerDocument = {
                 scheme: 'bearer',
                 bearerFormat: 'JWT',
                 description: 'Ingresa el token JWT proporcionado por el AuthService de .NET'
+            }
+        },
+        schemas: {
+            // ==========================================
+            // MODELOS
+            // ==========================================
+            Restaurant: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    name: { type: 'string', example: 'Restaurante El Gourmet' },
+                    address: { type: 'string', example: 'Calle Real 4-55, Zona 10' },
+                    categories: { type: 'string', enum: ['Gourmet', 'Casual'], example: 'Gourmet' },
+                    description: { type: 'string', example: 'Especialidad en comida internacional.' },
+                    openingTime: { type: 'string', example: '09:00' },
+                    closingTime: { type: 'string', example: '22:00' },
+                    averagePrice: { type: 'number', example: 150 },
+                    phone: { type: 'string', example: '22334455' },
+                    photo: { type: 'string', example: 'https://cloudinary.com/photo.jpg' },
+                    status: { type: 'string', enum: ['Abierto', 'Cerrado', 'En Mantenimiento'], example: 'Abierto' },
+                    isActive: { type: 'boolean', example: true },
+                    rating: { type: 'number', minimum: 1, maximum: 5, example: 4.5 },
+                    capacity: { type: 'number', example: 100 },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Table: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    restaurant: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    tableNumber: { type: 'string', example: '10' },
+                    capacity: { type: 'number', minimum: 1, maximum: 20, example: 4 },
+                    location: { type: 'string', enum: ['Terraza', 'Salón Principal', 'VIP', 'Bar', 'Jardín'], example: 'Salón Principal' },
+                    availability: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                day: { type: 'string', enum: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'] },
+                                startTime: { type: 'string', example: '09:00' },
+                                endTime: { type: 'string', example: '22:00' }
+                            }
+                        }
+                    },
+                    tableAvailability: { type: 'boolean', example: true },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Client: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    name: { type: 'string', example: 'Juan Pérez' },
+                    email: { type: 'string', example: 'juan@correo.com' },
+                    phone: { type: 'string', example: '55443322' },
+                    birthdate: { type: 'string', format: 'date', example: '1990-01-15' },
+                    gender: { type: 'string', enum: ['Masculino', 'Femenino', 'Otro'], example: 'Masculino' },
+                    addresses: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                alias: { type: 'string', enum: ['Casa', 'Trabajo', 'Otro'], example: 'Casa' },
+                                addressLine: { type: 'string', example: 'Avenida Siempre Viva 123' },
+                                houseNumber: { type: 'string', example: '123' },
+                                securityInfo: { type: 'string', example: 'Casa blanca con puerta verde' },
+                                reference: { type: 'string', example: 'Frente al parque' },
+                                isDefault: { type: 'boolean', example: true }
+                            }
+                        }
+                    },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Reservation: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    client: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    restaurant: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    table: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    reservationDate: { type: 'string', format: 'date-time', example: '2026-10-15T19:30:00Z' },
+                    numberOfPeople: { type: 'number', example: 4 },
+                    status: { type: 'string', enum: ['PENDIENTE', 'CONFIRMADA', 'COMPLETADA', 'CANCELADA', 'NO_ASISTIO'], example: 'PENDIENTE' },
+                    durationInMinutes: { type: 'number', example: 90 },
+                    specialRequests: { type: 'string', example: 'Mesa cerca de la ventana' },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Dish: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    name: { type: 'string', example: 'Pizza Margherita' },
+                    description: { type: 'string', example: 'Tomate, mozzarella fresca y albahaca.' },
+                    price: { type: 'number', example: 85.00 },
+                    dishType: { type: 'string', enum: ['ENTRADA', 'PLATO_FUERTE', 'POSTRE', 'BEBIDA'], example: 'PLATO_FUERTE' },
+                    ingredients: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                inventoryItem: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                                quantityUsed: { type: 'number', example: 200 }
+                            }
+                        }
+                    },
+                    restaurant: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    photo: { type: 'string', example: 'https://cloudinary.com/dish.jpg' },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Employee: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    userId: { type: 'string', example: 'auth0|123456' },
+                    restaurant: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    specialty: { type: 'string', enum: ['COCINERO', 'BARTENDER', 'CAMARERO', 'ADMINISTRATIVO', 'OTRO'], example: 'CAMARERO' },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Event: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    name: { type: 'string', example: 'Noche de Jazz' },
+                    description: { type: 'string', example: 'Música en vivo y menú especial de mariscos.' },
+                    typeEvent: { type: 'string', enum: ['CENA_TEMATICA', 'DEGUSTACION', 'FESTIVAL', 'OTRO'], example: 'CENA_TEMATICA' },
+                    capacity: { type: 'number', example: 50 },
+                    price: { type: 'number', example: 250 },
+                    attendees: {
+                        type: 'array',
+                        items: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' }
+                    },
+                    restaurant: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    assignedTables: {
+                        type: 'array',
+                        items: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' }
+                    },
+                    specialDishes: {
+                        type: 'array',
+                        items: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' }
+                    },
+                    assignedEmployees: {
+                        type: 'array',
+                        items: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' }
+                    },
+                    additionalServices: {
+                        type: 'array',
+                        items: { type: 'string', enum: ['MUSICA_EN_VIVO', 'DECORACION_ESPECIAL', 'FOTOGRAFIA', 'OTRO'] }
+                    },
+                    dateTime: { type: 'string', format: 'date-time', example: '2026-12-24T20:00:00Z' },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Order: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    client: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    restaurant: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    deliveryType: { type: 'string', enum: ['DOMICILIO', 'RECOGER'], example: 'DOMICILIO' },
+                    items: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                productId: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                                name: { type: 'string', example: 'Pizza Margherita' },
+                                price: { type: 'number', example: 85.00 },
+                                quantity: { type: 'number', example: 2 },
+                                subtotal: { type: 'number', example: 170.00 }
+                            }
+                        }
+                    },
+                    total: { type: 'number', example: 170.00 },
+                    deliveryAddress: {
+                        type: 'object',
+                        properties: {
+                            alias: { type: 'string', enum: ['Casa', 'Trabajo', 'Otro', 'N/A'], example: 'Casa' },
+                            addressLine: { type: 'string', example: 'Avenida Siempre Viva 123' },
+                            houseNumber: { type: 'string', example: '123' },
+                            securityInfo: { type: 'string', example: 'Casa blanca' },
+                            reference: { type: 'string', example: 'Frente al parque' }
+                        }
+                    },
+                    status: { type: 'string', enum: ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'EN_CAMINO', 'LISTO_PARA_RECOGER', 'ENTREGADO', 'CANCELADO'], example: 'PENDIENTE' },
+                    paymentMethod: { type: 'string', enum: ['EFECTIVO', 'TARJETA'], example: 'TARJETA' },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Invoice: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    invoiceNumber: { type: 'string', example: 'FAC-2024-001' },
+                    order: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    client: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    clientName: { type: 'string', example: 'Juan Pérez' },
+                    restaurant: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    restaurantName: { type: 'string', example: 'Restaurante El Gourmet' },
+                    items: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                name: { type: 'string', example: 'Pizza Margherita' },
+                                quantity: { type: 'number', example: 2 },
+                                price: { type: 'number', example: 85.00 },
+                                subtotal: { type: 'number', example: 170.00 }
+                            }
+                        }
+                    },
+                    total: { type: 'number', example: 170.00 },
+                    paymentMethod: { type: 'string', example: 'TARJETA' },
+                    issuedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Promotion: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    title: { type: 'string', example: 'Summer Deal 2024' },
+                    description: { type: 'string', example: '2x1 en bebidas nacionales de lunes a viernes.' },
+                    discountPercentage: { type: 'number', minimum: 0, maximum: 100, example: 50 },
+                    dishesApplicables: {
+                        type: 'array',
+                        items: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' }
+                    },
+                    restaurant: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    scope: { type: 'string', enum: ['EVENTOS', 'PEDIDOS', 'GENERAL'], example: 'GENERAL' },
+                    startDate: { type: 'string', format: 'date', example: '2026-06-01' },
+                    endDate: { type: 'string', format: 'date', example: '2026-08-31' },
+                    status: { type: 'string', enum: ['PENDING', 'APPROVED', 'REJECTED'], example: 'PENDING' },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Inventory: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    name: { type: 'string', example: 'Harina de Trigo' },
+                    quantity: { type: 'number', example: 50 },
+                    unit: { type: 'string', enum: ['KG', 'LITRO', 'UNIDAD', 'GRAMO', 'MILILITRO'], example: 'KG' },
+                    minStock: { type: 'number', minimum: 1, example: 10 },
+                    restaurant: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Comment: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    review: { type: 'number', minimum: 1, maximum: 5, example: 5 },
+                    comment: { type: 'string', example: 'Excelente servicio y comida.' },
+                    restaurantId: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    dishId: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            Notification: {
+                type: 'object',
+                properties: {
+                    _id: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    recipient: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    type: {
+                        type: 'string',
+                        enum: [
+                            'RESERVACION_RECIBIDA',
+                            'RESERVACION_CONFIRMADA',
+                            'RESERVACION_CANCELADA',
+                            'RESERVACION_COMPLETADA',
+                            'RESERVACION_NO_ASISTIO',
+                            'PEDIDO_RECIBIDO',
+                            'PEDIDO_CONFIRMADO',
+                            'PEDIDO_EN_PREPARACION',
+                            'PEDIDO_LISTO',
+                            'PEDIDO_ENTREGADO',
+                            'PEDIDO_CANCELADO'
+                        ],
+                        example: 'RESERVACION_CONFIRMADA'
+                    },
+                    title: { type: 'string', example: 'Reservación Confirmada' },
+                    message: { type: 'string', example: 'Tu reservación ha sido confirmada para el 15 de octubre' },
+                    referenceId: { type: 'string', example: '65f1a2b3c4d5e6f7a8b9c0d1' },
+                    referenceType: { type: 'string', enum: ['Reservation', 'Order'], example: 'Reservation' },
+                    isRead: { type: 'boolean', example: false },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
             }
         }
     },
