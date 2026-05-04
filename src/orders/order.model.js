@@ -65,7 +65,11 @@ const orderSchema = new mongoose.Schema({
         type: String,
         enum: ['EFECTIVO', 'TARJETA'],
         required: [true, "El método de pago es obligatorio"]
-    }
+    },
+    isActive: {
+        type: Boolean,
+        default: true
+    },
 }, { 
     timestamps: true,
     versionKey: false 
