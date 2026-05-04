@@ -1,11 +1,13 @@
 import { Router } from "express";
-import { validateCreateOrder, validateGetMyOrders, validateGetOrderById, validateUpdateStatus  } from '../../middlewares/order-validators.js';
+import { validateCreateOrder, validateGetMyOrders, validateGetOrderById, validateUpdateStatus } from '../../middlewares/order-validators.js';
 import {
     createOrder,
     getMyOrders,
     getOrderById,
-    updateOrderStatus
-
+    updateOrderStatus,
+    getOrders,
+    deleteOrder,
+    createOrderAdmin
 } from "./order.controller.js";
 
 const router = Router();
@@ -14,10 +16,23 @@ router.post("/create",
     validateCreateOrder,
     createOrder);
 
+router.post("/create-admin",
+    validateCreateOrder,
+    createOrderAdmin);
 
-router.get("/getMyOrders", validateGetMyOrders, getMyOrders);
+router.get("/get", validateGetOrders,
+    getOrders);
 
-router.get("/:id", validateGetOrderById, getOrderById);
+router.get("/getMyOrders", validateGetMyOrders,
+    getMyOrders);
+
+router.get("/:id", validateGetOrderById, 
+    getOrderById);
+
+
+
+router.put("/delete/:id", validateDeleteOrder,
+    deleteOrder);
 
 router.put("/:id/status",
     validateUpdateStatus,

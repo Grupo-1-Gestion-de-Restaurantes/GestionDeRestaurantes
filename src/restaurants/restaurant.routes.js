@@ -26,7 +26,7 @@ router.post("/create",
 router.get("/get", getRestaurantes);
 
 router.get(
-  '/:id',
+  '/activity/:id',
   getRestaurantActivityReport,
   getActivity
 );
@@ -46,7 +46,6 @@ router.put("/:id",
   updateRestaurante);
 
 router.delete("/:id", validateRestaurantStatusChange, changeRestauranteStatus);
-
 
 
 
