@@ -20,18 +20,18 @@ router.post("/create-admin",
     validateCreateOrder,
     createOrderAdmin);
 
-router.get("/get", validateGetOrders,
+router.get("/get", //validateGetOrders,
     getOrders);
 
 router.get("/getMyOrders", validateGetMyOrders,
     getMyOrders);
 
-router.get("/:id", validateGetOrderById, 
+router.get("/:id", validateGetOrderById,
     getOrderById);
 
 
 
-router.put("/delete/:id", validateDeleteOrder,
+router.put("/delete/:id", //validateDeleteOrder,
     deleteOrder);
 
 router.put("/:id/status",
