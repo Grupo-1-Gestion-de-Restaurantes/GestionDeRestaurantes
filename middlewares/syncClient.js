@@ -8,7 +8,7 @@ export const syncClient = async (req, res, next) => {
                 message: "ID de usuario no disponible"
             });
         }
-        const { id, name, email } = req.user; 
+        const { id, name, email, role } = req.user; 
 
         const user = await Client.findOneAndUpdate(
             { _id: id },
@@ -22,10 +22,10 @@ export const syncClient = async (req, res, next) => {
                     isActive: true
                 }
             },
-            { upsert: true, new: true, runValidators: false } 
+            { upsert: true, new: true, runValidators: false, lean: true } 
         );
 
-        req.user = user;
+        req.user = { ...user, role };
         next();
 
     } catch (error) {

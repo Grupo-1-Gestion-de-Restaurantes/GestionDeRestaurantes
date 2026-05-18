@@ -1,5 +1,14 @@
 import { Router } from "express";
-import { validateCreateOrder, validateGetMyOrders, validateGetOrderById, validateUpdateStatus } from '../../middlewares/order-validators.js';
+import { 
+    validateCreateOrder, 
+    validateCreateOrderAdmin, 
+    validateGetMyOrders, 
+    validateGetOrderById, 
+    validateUpdateStatus,
+    validateGetOrders,
+    validateDeleteOrder,
+    validateUpdateOrderAdmin
+} from '../../middlewares/order-validators.js';
 import {
     createOrder,
     getMyOrders,
@@ -7,7 +16,8 @@ import {
     updateOrderStatus,
     getOrders,
     deleteOrder,
-    createOrderAdmin
+    createOrderAdmin,
+    updateOrderAdmin
 } from "./order.controller.js";
 
 const router = Router();
@@ -17,10 +27,11 @@ router.post("/create",
     createOrder);
 
 router.post("/create-admin",
-    validateCreateOrder,
+    validateCreateOrderAdmin,
     createOrderAdmin);
 
-router.get("/get", //validateGetOrders,
+router.get("/get", 
+    validateGetOrders,
     getOrders);
 
 router.get("/getMyOrders", validateGetMyOrders,
@@ -29,10 +40,13 @@ router.get("/getMyOrders", validateGetMyOrders,
 router.get("/:id", validateGetOrderById,
     getOrderById);
 
-
-
-router.put("/delete/:id", //validateDeleteOrder,
+router.put("/delete/:id", 
+    validateDeleteOrder,
     deleteOrder);
+
+router.put("/update-admin/:id",
+    validateUpdateOrderAdmin,
+    updateOrderAdmin);
 
 router.put("/:id/status",
     validateUpdateStatus,

@@ -5,10 +5,16 @@ import PDFDocument from "pdfkit-table";
 
 export const getMyInvoices = async (req, res) => {
     try {
-        const client = req.user;
-        const clientId = client.uid || client._id;
+        const user = req.user;
+        const userId = user.uid || user._id || user.id;
 
-        const invoices = await Invoice.find({ client: clientId })
+        // Si es ADMIN o MANAGER, puede ver todas las facturas del sistema.
+        // Si es CLIENT, solo las suyas.
+        const filter = (user.role === 'ADMIN_ROLE' || user.role === 'MANAGER_ROLE')
+            ? {}
+            : { client: userId.toString() };
+
+        const invoices = await Invoice.find(filter)
             .populate('restaurant', 'name photo address')
             .sort({ issuedAt: -1 });
 

@@ -3,6 +3,22 @@ import Reservation from "../reservations/reservation.model.js";
 import Order from "../orders/order.model.js";
 import mongoose from "mongoose";
 
+const parseActiveFilter = (value) => {
+  if (value === undefined || value === null || value === '' || value === 'all') {
+    return undefined;
+  }
+
+  if (value === true || value === 'true' || value === 'active') {
+    return true;
+  }
+
+  if (value === false || value === 'false' || value === 'inactive') {
+    return false;
+  }
+
+  return undefined;
+};
+
 export const createRestaurante = async (req, res) => {
   try {
 
@@ -32,20 +48,32 @@ export const createRestaurante = async (req, res) => {
 
 export const getRestaurantes = async (req, res) => {
   try {
-    const { page = 1, limit = 10, isActive = true } = req.query;
+    const { page = 1, limit = 10, isActive, search = '' } = req.query;
 
-    const filter = { isActive };
+    const normalizedIsActive = parseActiveFilter(isActive);
+    const filter = {};
+    const normalizedSearch = String(search).trim();
 
-    const options = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sort: { createdAt: -1 }
+    if (normalizedIsActive !== undefined) {
+      filter.isActive = normalizedIsActive;
     }
 
+    if (normalizedSearch) {
+      filter.$or = [
+        { name: { $regex: normalizedSearch, $options: 'i' } },
+        { address: { $regex: normalizedSearch, $options: 'i' } },
+        { categories: { $regex: normalizedSearch, $options: 'i' } },
+        { status: { $regex: normalizedSearch, $options: 'i' } },
+      ];
+    }
+
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 10;
+
     const restaurantes = await Restaurante.find(filter)
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort(options.sort);
+      .limit(parsedLimit)
+      .skip((parsedPage - 1) * parsedLimit)
+      .sort({ createdAt: -1 });
 
     const total = await Restaurante.countDocuments(filter);
 
@@ -53,10 +81,10 @@ export const getRestaurantes = async (req, res) => {
       success: true,
       data: restaurantes,
       pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
+        currentPage: parsedPage,
+        totalPages: Math.ceil(total / parsedLimit),
         totalRecords: total,
-        limit,
+        limit: parsedLimit,
         restaurantes
       }
     })
@@ -109,6 +137,14 @@ export const updateRestaurante = async (req, res) => {
 
     const updateData = { ...req.body };
 
+    if (updateData.status && updateData.isActive === undefined) {
+      updateData.isActive = updateData.status === 'Abierto';
+    }
+
+    if (updateData.isActive !== undefined && updateData.status === undefined) {
+      updateData.status = updateData.isActive ? 'Abierto' : 'Cerrado';
+    }
+
     if (req.file) {
       if (currentRestaurante.photo_public_id) {
         await cloudinary.uploader.destroy(currentRestaurante.photo_public_id);
@@ -143,10 +179,11 @@ export const changeRestauranteStatus = async (req, res) => {
     // Detectar si es activate o deactivate desde la URL
     const isActive = req.url.includes('/activate');
     const action = isActive ? 'activado' : 'desactivado';
+    const status = isActive ? 'Abierto' : 'Cerrado';
 
     const restaurante = await Restaurante.findByIdAndUpdate(
       id,
-      { isActive },
+      { isActive, status },
       { new: true }
     );
 

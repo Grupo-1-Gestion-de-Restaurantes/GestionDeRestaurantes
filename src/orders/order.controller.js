@@ -285,17 +285,22 @@ export const updateOrderStatus = async (req, res) => {
         const normalizedStatus = status.toUpperCase();
 
         if (normalizedStatus === 'CANCELADO') {
-            if (order.client.toString() !== (user.uid || user._id).toString()) {
-                return res.status(403).json({
-                    success: false,
-                    message: "No tienes permiso para cancelar este pedido"
-                });
-            }
-            if (order.status !== 'PENDIENTE') {
-                return res.status(400).json({
-                    success: false,
-                    message: "No puedes cancelar un pedido que ya está en proceso o entregado"
-                });
+            const orderClientId = order.client?.toString();
+            const authUserId = (user.uid || user._id || user.id)?.toString();
+
+            if (user.role !== 'ADMIN_ROLE' && user.role !== 'MANAGER_ROLE') {
+                if (!orderClientId || orderClientId !== authUserId) {
+                    return res.status(403).json({
+                        success: false,
+                        message: "No tienes permiso para cancelar este pedido"
+                    });
+                }
+                if (order.status !== 'PENDIENTE') {
+                    return res.status(400).json({
+                        success: false,
+                        message: "No puedes cancelar un pedido que ya está en proceso o entregado"
+                    });
+                }
             }
         }
 
@@ -327,6 +332,180 @@ export const updateOrderStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error al actualizar el estado del pedido",
+            error: error.message
+        });
+    }
+};
+
+export const createOrderAdmin = async (req, res) => {
+    try {
+        const { clientId, restaurantId, items, paymentMethod, deliveryAddress, deliveryType } = req.body;
+
+        console.log("BODY RECIBIDO:", req.body);
+
+        if (!clientId || !restaurantId) {
+            return res.status(400).json({
+                success: false,
+                message: "Faltan campos obligatorios: clientId o restaurantId",
+            });
+        }
+        const client = await Client.findOne({ _id: clientId.trim() });
+
+        if (!client) {
+            return res.status(404).json({
+                success: false,
+                message: `El cliente con ID '${clientId}' no existe.`
+            });
+        }
+
+        const restaurant = await Restaurant.findById(restaurantId);
+        if (!restaurant) {
+            return res.status(404).json({ success: false, message: "Restaurante no encontrado" });
+        }
+
+        let totalOrder = 0;
+
+        const hydratedItems = await Promise.all(items.map(async (item) => {
+            const dish = await Dish.findOne({
+                _id: item.dishId,
+                restaurant: restaurantId,
+                isActive: true
+            });
+
+            if (!dish) {
+                throw new Error(`El plato con ID ${item.dishId} no está disponible en este restaurante`);
+            }
+
+            const subtotal = dish.price * item.quantity;
+            totalOrder += subtotal;
+
+            return {
+                productId: dish._id,
+                name: dish.name,
+                price: dish.price,
+                quantity: item.quantity,
+                subtotal: subtotal
+            };
+        }));
+
+        const newOrder = new Order({
+            client: clientId,
+            restaurant: restaurantId,
+            items: hydratedItems,
+            total: totalOrder,
+            deliveryType: deliveryType || 'DOMICILIO',
+            deliveryAddress: {
+                alias: deliveryAddress.alias || "Dirección de Entrega",
+                addressLine: deliveryAddress.addressLine,
+            },
+            paymentMethod,
+            status: "CONFIRMADO"
+        });
+
+        const savedOrder = await newOrder.save();
+
+        const invoiceCount = await Invoice.countDocuments();
+        const invoiceNumber = `INV-ADM-${Date.now()}-${(invoiceCount + 1).toString().padStart(4, '0')}`;
+
+        const newInvoice = new Invoice({
+            invoiceNumber,
+            order: savedOrder._id,
+            client: clientId,
+            clientName: client.name,
+            restaurant: restaurantId,
+            restaurantName: restaurant.name,
+            items: hydratedItems,
+            total: totalOrder,
+            paymentMethod
+        });
+
+        const savedInvoice = await newInvoice.save();
+
+        generatePDFBuffer(savedInvoice)
+            .then(pdfBuffer => {
+                return sendInvoiceEmail(client.email, pdfBuffer, savedInvoice.invoiceNumber);
+            })
+            .then(() => console.log(`Factura Admin enviada a ${client.email}`))
+            .catch(err => console.error("Error enviando factura desde Admin:", err));
+
+        res.status(201).json({
+            success: true,
+            message: "Orden administrativa creada y factura enviada",
+            order: savedOrder
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Error al procesar la orden administrativa",
+            error: error.message
+        });
+    }
+};
+
+export const updateOrderAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { clientId, restaurantId, items, paymentMethod, deliveryAddress, deliveryType } = req.body;
+
+        const order = await Order.findById(id);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Pedido no encontrado" });
+        }
+
+        const updateData = {};
+
+        if (clientId) updateData.client = clientId;
+        if (restaurantId) updateData.restaurant = restaurantId;
+        if (paymentMethod) updateData.paymentMethod = paymentMethod;
+        if (deliveryType) updateData.deliveryType = deliveryType;
+        if (deliveryAddress) {
+            updateData.deliveryAddress = {
+                alias: deliveryAddress.alias || order.deliveryAddress.alias,
+                addressLine: deliveryAddress.addressLine || order.deliveryAddress.addressLine,
+            };
+        }
+
+        if (items) {
+            const restaurantIdToUse = restaurantId || order.restaurant;
+            const hydratedItems = await Promise.all(items.map(async (item) => {
+                const dish = await Dish.findOne({
+                    _id: item.dishId,
+                    restaurant: restaurantIdToUse,
+                    isActive: true
+                });
+
+                if (!dish) {
+                    throw new Error(`El plato con ID ${item.dishId} no está disponible en este restaurante`);
+                }
+
+                const subtotal = dish.price * item.quantity;
+
+                return {
+                    productId: dish._id,
+                    name: dish.name,
+                    price: dish.price,
+                    quantity: item.quantity,
+                    subtotal: subtotal
+                };
+            }));
+
+            updateData.items = hydratedItems;
+            updateData.total = hydratedItems.reduce((acc, item) => acc + item.subtotal, 0);
+        }
+
+        const updatedOrder = await Order.findByIdAndUpdate(id, updateData, { new: true });
+
+        res.status(200).json({
+            success: true,
+            message: "Pedido actualizado correctamente",
+            order: updatedOrder
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Error al actualizar el pedido",
             error: error.message
         });
     }
@@ -411,111 +590,6 @@ export const deleteOrder = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error al intentar eliminar (desactivar) el pedido",
-            error: error.message
-        });
-    }
-};
-
-export const createOrderAdmin = async (req, res) => {
-    try {
-        const { clientId, restaurantId, items, paymentMethod, deliveryAddress } = req.body;
-
-        console.log("BODY RECIBIDO:", req.body);
-
-        if (!clientId || !restaurantId) {
-            return res.status(400).json({
-                success: false,
-                message: "Faltan campos obligatorios: clientId o restaurantId",
-            });
-        }
-        const client = await Client.findOne({ _id: clientId.trim() });
-
-        if (!client) {
-            return res.status(404).json({
-                success: false,
-                message: `El cliente con ID '${clientId}' no existe.`
-            });
-        }
-
-        const restaurant = await Restaurant.findById(restaurantId);
-        if (!restaurant) {
-            return res.status(404).json({ success: false, message: "Restaurante no encontrado" });
-        }
-
-        let totalOrder = 0;
-
-        const hydratedItems = await Promise.all(items.map(async (item) => {
-            const dish = await Dish.findOne({
-                _id: item.dishId,
-                restaurant: restaurantId,
-                isActive: true
-            });
-
-            if (!dish) {
-                throw new Error(`El plato con ID ${item.dishId} no está disponible en este restaurante`);
-            }
-
-            const subtotal = dish.price * item.quantity;
-            totalOrder += subtotal;
-
-            return {
-                productId: dish._id,
-                name: dish.name,
-                price: dish.price,
-                quantity: item.quantity,
-                subtotal: subtotal
-            };
-        }));
-
-        const newOrder = new Order({
-            client: clientId,
-            restaurant: restaurantId,
-            items: hydratedItems,
-            total: totalOrder,
-            deliveryAddress: {
-                alias: deliveryAddress.alias || "Dirección de Entrega",
-                addressLine: deliveryAddress.addressLine,
-            },
-            paymentMethod,
-            status: "CONFIRMADO"
-        });
-
-        const savedOrder = await newOrder.save();
-
-        const invoiceCount = await Invoice.countDocuments();
-        const invoiceNumber = `INV-ADM-${Date.now()}-${(invoiceCount + 1).toString().padStart(4, '0')}`;
-
-        const newInvoice = new Invoice({
-            invoiceNumber,
-            order: savedOrder._id,
-            client: clientId,
-            clientName: client.name,
-            restaurant: restaurantId,
-            restaurantName: restaurant.name,
-            items: hydratedItems,
-            total: totalOrder,
-            paymentMethod
-        });
-
-        const savedInvoice = await newInvoice.save();
-
-        generatePDFBuffer(savedInvoice)
-            .then(pdfBuffer => {
-                return sendInvoiceEmail(client.email, pdfBuffer, savedInvoice.invoiceNumber);
-            })
-            .then(() => console.log(`Factura Admin enviada a ${client.email}`))
-            .catch(err => console.error("Error enviando factura desde Admin:", err));
-
-        res.status(201).json({
-            success: true,
-            message: "Orden administrativa creada y factura enviada",
-            order: savedOrder
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: "Error al procesar la orden administrativa",
             error: error.message
         });
     }
