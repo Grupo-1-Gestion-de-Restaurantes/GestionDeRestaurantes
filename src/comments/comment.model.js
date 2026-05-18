@@ -28,6 +28,12 @@ const commentSchema = new mongoose.Schema({
         required: false
     },
 
+    clientId: {
+        type: String,
+        ref: "Client",
+        required: false
+    },
+
     isActive: {
         type: Boolean,
         default: true
