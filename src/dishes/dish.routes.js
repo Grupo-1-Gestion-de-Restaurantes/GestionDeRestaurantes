@@ -28,7 +28,7 @@ router.put('/:id',
     validateUpdateDish,
     updateDish);
 
-router.patch('/:id',
+router.put('/:id',
     validateChangeDishStatus,
     changeDishStatus);
 

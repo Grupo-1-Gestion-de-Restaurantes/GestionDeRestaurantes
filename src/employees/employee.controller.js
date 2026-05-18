@@ -97,6 +97,7 @@ export const createEmployee = async (req, res) => {
 
         const newEmployee = new Employee({
             userId: createdUserId,
+            fullName: `${employeeData.name} ${employeeData.surname}`.trim(),
             restaurant: employeeData.restaurant,
             specialty: (employeeData.role === 'MANAGER_ROLE') ? "ADMINISTRATIVO" : employeeData.specialty
         });

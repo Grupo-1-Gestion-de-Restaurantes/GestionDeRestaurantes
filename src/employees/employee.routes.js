@@ -24,7 +24,7 @@ router.put('/:id',
     validateUpdateEmployee,
     updateEmployee);
 
-router.patch('/:id',
+router.put('/:id/status',
     validateChangeEmployeeStatus,
     changeEmployeeStatus);
 

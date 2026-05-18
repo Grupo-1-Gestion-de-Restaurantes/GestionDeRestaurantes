@@ -49,7 +49,7 @@ export const validateUpdateClientRequest = [
     body('phone')
         .optional()
         .trim()
-        .matches(/^[0-9]{0,8}$/)
+        .matches(/^[0-9]{7,15}$/)
         .withMessage('Teléfono inválido'),
     body('birthdate')
         .optional()
