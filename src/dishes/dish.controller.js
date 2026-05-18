@@ -48,8 +48,23 @@ export const createDish = async (req, res) => {
 export const getDishes = async (req, res) => {
     try {
 
-        const { page = 1, limit = 10, isActive = true } = req.query;
-        const filter = { isActive };
+        const { page = 1, limit = 10, isActive, search = '', dishType = '' } = req.query;
+
+        const filter = {};
+        if (isActive !== undefined) {
+            filter.isActive = isActive === 'true';
+        }
+
+        if (search) {
+            filter.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        if (dishType) {
+            filter.dishType = dishType;
+        }
 
         const options = {
             page: parseInt(page),
@@ -58,6 +73,7 @@ export const getDishes = async (req, res) => {
         };
 
         const dishes = await Dish.find(filter)
+            .populate({ path: 'restaurant', model: 'Restaurante', select: 'name' })
             .limit(options.limit)
             .skip((options.page - 1) * options.limit)
             .sort(options.sort);
@@ -69,7 +85,7 @@ export const getDishes = async (req, res) => {
             data: dishes,
             pagination: {
                 currentPage: options.page,
-                totalPages: Math.ceil(total / limit),
+                totalPages: Math.ceil(total / options.limit),
                 totalRecords: total,
                 limit: options.limit
             }
