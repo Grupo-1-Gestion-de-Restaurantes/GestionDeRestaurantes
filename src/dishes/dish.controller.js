@@ -6,6 +6,10 @@ export const createDish = async (req, res) => {
 
         const dishData = req.body;
 
+        if (dishData.ingredients && typeof dishData.ingredients === 'string') {
+            dishData.ingredients = JSON.parse(dishData.ingredients);
+        }
+
         if (!dishData.restaurant) {
             return res.status(400).json({
                 success: false,
@@ -20,7 +24,7 @@ export const createDish = async (req, res) => {
                 message: 'El restaurante proporcionado no existe'
             });
         }
-        if (req.file){
+        if (req.file) {
             dishData.photo = req.file.path;
         }
 
@@ -58,7 +62,7 @@ export const getDishes = async (req, res) => {
             .skip((options.page - 1) * options.limit)
             .sort(options.sort);
 
-            const total = await Dish.countDocuments(filter);
+        const total = await Dish.countDocuments(filter);
 
         res.status(200).json({
             success: true,
@@ -98,7 +102,7 @@ export const getDishById = async (req, res) => {
             message: 'Platillo obtenido exitosamente',
             data: dish
         });
-        
+
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -115,7 +119,11 @@ export const updateDish = async (req, res) => {
         const dishId = req.params.id;
         const updateData = req.body;
 
-        if (req.file){
+        if (updateData.ingredients && typeof updateData.ingredients === 'string') {
+            updateData.ingredients = JSON.parse(updateData.ingredients);
+        }
+
+        if (req.file) {
             updateData.photo = req.file.path;
         }
 
@@ -133,7 +141,7 @@ export const updateDish = async (req, res) => {
             message: 'Platillo actualizado exitosamente',
             data: updatedDish
         });
-        
+
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -162,7 +170,7 @@ export const changeDishStatus = async (req, res) => {
             message: `Platillo ${isActive ? 'activado' : 'desactivado'} exitosamente`,
             data: updatedDish
         });
-        
+
     } catch (error) {
         res.status(500).json({
             success: false,
