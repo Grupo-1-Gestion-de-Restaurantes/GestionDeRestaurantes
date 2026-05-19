@@ -78,6 +78,10 @@ const eventSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true
+    },
+    photo: {
+        type: String,
+        default: 'https://res.cloudinary.com/degzwfdz3/image/upload/v1771700198/no-photo_orrdvt.avif',
     }
 }, {
     timestamps: true,

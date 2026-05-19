@@ -1,4 +1,3 @@
-import { parse } from 'dotenv';
 import Client from './client.model.js';
 
 export const createClient = async (req, res) => {
@@ -33,7 +32,8 @@ export const createClient = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(400).json({
+        const status = error.name === 'ValidationError' ? 400 : 500;
+        res.status(status).json({
             success: false,
             message: 'Error al registrar el cliente',
             error: error.message
@@ -125,6 +125,12 @@ export const getClientById = async (req, res) => {
 export const updateClient = async (req, res) => {
     try {
         const client = req.user;
+        
+        // Evitar actualizar campos protegidos
+        delete req.body.email;
+        delete req.body.role;
+        delete req.body._id;
+
         const { address, ...otherData } = req.body;
 
         client.set(otherData);
@@ -151,7 +157,8 @@ export const updateClient = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({
+        const status = error.name === 'ValidationError' ? 400 : 500;
+        res.status(status).json({
             success: false,
             message: "Error al actualizar",
             error: error.message
@@ -172,25 +179,29 @@ export const addAddressToClient = async (req, res) => {
             });
         }
 
-        client.set(req.body);
-
-
-        if (req.body.address) {
-            client.addresses.push(req.body.address);
+        if (!req.body.address) {
+            return res.status(400).json({
+                success: false,
+                message: "La dirección es obligatoria"
+            });
         }
 
-        await client.save();
+        const updatedClient = await Client.findByIdAndUpdate(
+            client._id,
+            { $push: { addresses: req.body.address } },
+            { new: true, runValidators: true }
+        );
 
         res.status(200).json({
             success: true,
-            message: "Perfil actualizado correctamente",
-            data: client
+            message: "Dirección agregada correctamente",
+            data: updatedClient
         });
 
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: "Error al actualizar el cliente",
+            message: "Error al agregar la dirección",
             error: error.message
         });
     }
@@ -236,17 +247,10 @@ export const getMyInfo = async (req, res) => {
         const client = req.user;
 
         if (!client) {
-            return res.status(404).json({
-                success: false,
-                message: 'Información de perfil no encontrada',
-            });
+            return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'Perfil obtenido exitosamente',
-            data: client
-        });
+        res.status(200).json({ success: true, data: client });
     } catch (error) {
         res.status(500).json({
             success: false,

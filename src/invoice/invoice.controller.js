@@ -69,6 +69,45 @@ export const getInvoiceById = async (req, res) => {
     }
 };
 
+export const getInvoicePdfById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const client = req.user;
+        const clientId = client.uid || client._id;
+
+        const invoice = await Invoice.findById(id)
+            .populate('restaurant', 'name photo address phone')
+            .populate('order', 'status');
+
+        if (!invoice) {
+            return res.status(404).json({
+                success: false,
+                message: "Factura no encontrada"
+            });
+        }
+
+        if (invoice.client.toString() !== clientId.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "No tienes permiso para ver esta factura"
+            });
+        }
+
+        const pdfBuffer = await generatePDFBuffer(invoice);
+        const safeInvoiceNumber = String(invoice.invoiceNumber || 'factura').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeInvoiceNumber}.pdf"`);
+        res.status(200).send(pdfBuffer);
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Error al generar la factura",
+            error: error.message
+        });
+    }
+};
+
 
 export const generatePDFBuffer = async (invoice) => {
     return new Promise((resolve, reject) => {

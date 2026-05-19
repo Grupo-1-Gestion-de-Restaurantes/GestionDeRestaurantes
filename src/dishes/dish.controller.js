@@ -48,6 +48,7 @@ export const createDish = async (req, res) => {
 export const getDishes = async (req, res) => {
     try {
 
+<<<<<<< Updated upstream
         const { page = 1, limit = 10, isActive, search = '', dishType = '' } = req.query;
 
         const filter = {};
@@ -64,6 +65,13 @@ export const getDishes = async (req, res) => {
 
         if (dishType) {
             filter.dishType = dishType;
+=======
+        const { page = 1, limit = 10, isActive = true, restaurant } = req.query;
+        const filter = { isActive: isActive === 'true' || isActive === true };
+
+        if (restaurant) {
+            filter.restaurant = restaurant;
+>>>>>>> Stashed changes
         }
 
         const options = {

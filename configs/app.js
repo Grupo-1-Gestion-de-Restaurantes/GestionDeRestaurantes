@@ -24,9 +24,17 @@ import reportRoutes from '../src/reports/reports.routes.js';
 import inventoryRoutes from '../src/inventories/inventory.routes.js';
 import commentRoutes from '../src/comments/comment.routes.js';
 import notificationRoutes from '../src/notifications/notification.routes.js';
+import partnerRoutes from '../src/partners/partner.routes.js';
 import { initializeSocket } from '../src/notifications/notification.service.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './swagger.js';
+import { seedRestaurantsIfEmpty } from '../src/seed/restaurants.seed.js';
+import { seedDishesIfEmpty } from '../src/seed/dishes.seed.js';
+import { seedTablesIfEmpty } from '../src/seed/tables.seed.js';
+import { seedPromotionsIfEmpty } from '../src/seed/promotions.seed.js';
+import { seedEventsIfEmpty } from '../src/seed/events.seed.js';
+import { runMassiveSeed } from '../massive-seed.js';
+
 const BASE_PATH = '/gestionDeRestaurantes/v1';
 
 const middlewares = (app) => {
@@ -63,6 +71,7 @@ const routes = (app) => {
     app.use(`${BASE_PATH}/inventories`, inventoryRoutes);
     app.use(`${BASE_PATH}/comments`, commentRoutes);
     app.use(`${BASE_PATH}/notifications`, notificationRoutes);
+    app.use(`${BASE_PATH}/partners`, partnerRoutes);
     app.use((req, res) => {
         res.status(404).json({
             success: false,
@@ -81,6 +90,15 @@ export const initServer = async () => {
 
     try {
         await dbConnection();
+        
+        // Seeders logic
+        await seedRestaurantsIfEmpty();
+        await seedDishesIfEmpty();
+        await seedTablesIfEmpty();
+        await seedPromotionsIfEmpty();
+        await seedEventsIfEmpty();
+        await runMassiveSeed();
+
         middlewares(app);
         routes(app);
 

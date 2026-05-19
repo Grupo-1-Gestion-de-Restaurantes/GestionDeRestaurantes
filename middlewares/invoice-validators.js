@@ -25,3 +25,12 @@ export const validateGetMyInvoices = [
         .withMessage('La fecha de fin debe tener un formato válido (YYYY-MM-DD)'),
     checkValidators
 ];
+
+export const validateGetInvoiceById = [
+    validateJWT,
+    syncClient,
+    param('id')
+        .notEmpty().withMessage('El ID es obligatorio')
+        .isMongoId().withMessage('El ID debe ser un ObjectId válido'),
+    checkValidators,
+];

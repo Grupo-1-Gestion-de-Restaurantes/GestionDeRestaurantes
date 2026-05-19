@@ -48,8 +48,27 @@ export const createRestaurante = async (req, res) => {
 
 export const getRestaurantes = async (req, res) => {
   try {
-    const { page = 1, limit = 10, isActive, search = '' } = req.query;
+    const { page = 1, limit = 10, isActive, search = '',  city, rating, categories} = req.query;
 
+    const filter = { isActive };
+
+    if (city) {
+      filter.city = { $regex: city, $options: 'i' };
+    }
+
+    if (rating) {
+      filter.rating = { $gte: Number(rating) };
+    }
+
+    if (categories) {
+      filter.categories = categories;
+    }
+
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort: { createdAt: -1 }
+    }
     const normalizedIsActive = parseActiveFilter(isActive);
     const filter = {};
     const normalizedSearch = String(search).trim();

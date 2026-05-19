@@ -37,12 +37,20 @@ export const createPromotion = async (req, res) => {
 
 export const getPromotion = async (req, res) => {
     try {
+<<<<<<< Updated upstream
         const { page = 1, limit = 10, isActive } = req.query;
         const filter = {};
         const normalizedIsActive = parseActiveFilter(isActive);
 
         if (normalizedIsActive !== undefined) {
             filter.isActive = normalizedIsActive;
+=======
+        const { page = 1, limit = 10, isActive = true, restaurant } = req.query;
+        const filter = { isActive: isActive === 'true' || isActive === true };
+
+        if (restaurant) {
+            filter.restaurant = restaurant;
+>>>>>>> Stashed changes
         }
 
         const options = {

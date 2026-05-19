@@ -54,6 +54,10 @@ const promotionSchema = new mongoose.Schema({
         },
         default: 'PENDING'
     },
+    isOneTimeUse: {
+        type: Boolean,
+        default: false
+    },
     isActive: {
         type: Boolean,
         default: true

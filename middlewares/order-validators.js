@@ -16,6 +16,10 @@ export const validateCreateOrder = [
         .notEmpty().withMessage('El método de pago es obligatorio')
         .isIn(['EFECTIVO', 'TARJETA']).withMessage('Método de pago debe ser EFECTIVO o TARJETA'),
 
+    body('deliveryType')
+        .optional()
+        .isIn(['DOMICILIO', 'RECOGER']).withMessage('El tipo de entrega debe ser DOMICILIO o RECOGER'),
+
     body('items')
         .isArray({ min: 1 }).withMessage('El pedido debe contener al menos un plato'),
 
@@ -26,9 +30,19 @@ export const validateCreateOrder = [
     body('items.*.quantity')
         .notEmpty().withMessage('La cantidad es obligatoria')
         .isInt({ min: 1 }).withMessage('La cantidad mínima debe ser 1'),
+        
     body('promotion')
         .optional()
         .isMongoId().withMessage('El ID de promoción debe ser un ID válido de MongoDB'),
+
+    body('addressId')
+        .optional()
+        .isMongoId().withMessage('ID de dirección no válido'),
+
+    body('deliveryAddress')
+        .optional()
+        .isObject().withMessage('La dirección de entrega debe ser un objeto'),
+
     checkValidators
 ];
 

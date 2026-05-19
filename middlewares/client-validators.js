@@ -49,8 +49,13 @@ export const validateUpdateClientRequest = [
     body('phone')
         .optional()
         .trim()
+<<<<<<< Updated upstream
         .matches(/^[0-9]{7,15}$/)
         .withMessage('Teléfono inválido'),
+=======
+        .matches(/^[0-9]{8,15}$/)
+        .withMessage('Teléfono inválido (debe tener entre 8 y 15 dígitos)'),
+>>>>>>> Stashed changes
     body('birthdate')
         .optional()
         .isISO8601()

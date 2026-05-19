@@ -19,6 +19,13 @@ const restaurantSchema = mongoose.Schema(
       trim: true
     },
 
+    city: {
+      type: String,
+      required: [true, "La ciudad es obligatoria"],
+      trim: true,
+      default: "Guatemala"
+    },
+
     categories: {
       type: String,
       required: true,

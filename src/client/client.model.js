@@ -30,15 +30,15 @@ const clientSchema = mongoose.Schema(
 
         birthdate: {
             type: Date,
-            required: [true, "La fecha de nacimiento es obligatoria"]
+            required: false
         },
 
         gender: {
             type: String,
-            required: [true, "El género es obligatorio"],
+            required: false,
             enum: {
                 values: ["Masculino", "Femenino", "Otro"],
-                message: "El género debe ser Masculino o Femenino"
+                message: "El género debe ser Masculino, Femenino u Otro"
             }
         },
 
