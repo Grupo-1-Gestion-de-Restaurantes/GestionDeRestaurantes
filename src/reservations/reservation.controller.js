@@ -7,6 +7,66 @@ export const createReservation = async (req, res) => {
     try {
 
         const reservationData = req.body;
+        const { restaurant, table, reservationDate, durationInMinutes, numberOfPeople } = reservationData;
+
+        const targetTable = await Table.findById(table);
+        if (!targetTable) {
+            return res.status(404).json({
+                success: false,
+                message: 'La mesa seleccionada no existe.'
+            });
+        }
+
+        if (String(targetTable.restaurant) !== String(restaurant)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Error de integridad: La mesa seleccionada no pertenece a este restaurante.'
+            });
+        }
+
+        if (Number(numberOfPeople) > targetTable.capacity) {
+            return res.status(400).json({
+                success: false,
+                message: `La mesa seleccionada es muy pequeña. Capacidad máxima: ${targetTable.capacity} personas, pero intentas reservar para ${numberOfPeople}.`
+            });
+        }
+
+        const newStart = new Date(reservationDate);
+        const duration = durationInMinutes || 90; 
+        const newEnd = new Date(newStart.getTime() + duration * 60000);
+
+        const overlappingReservation = await Reservation.findOne({
+            table: table,
+            restaurant: restaurant,
+            isActive: true,
+            status: { $nin: ['CANCELADA', 'NO_ASISTIO'] }, 
+            $expr: {
+                $let: {
+                    vars: {
+                        existingStart: "$reservationDate",
+                        existingEnd: {
+                            $add: [
+                                "$reservationDate",
+                                { $multiply: [{ $ifNull: ["$durationInMinutes", 90] }, 60000] }
+                            ]
+                        }
+                    },
+                    in: {
+                        $and: [
+                            { $lt: [newStart, "$$existingEnd"] },
+                            { $gt: [newEnd, "$$existingStart"] }
+                        ]
+                    }
+                }
+            }
+        });
+
+        if (overlappingReservation) {
+            return res.status(400).json({
+                success: false,
+                message: 'La mesa ya se encuentra reservada o en uso durante ese lapso de tiempo.'
+            });
+        }
 
         const reservation = new Reservation(reservationData);
         await reservation.save();
@@ -24,16 +84,16 @@ export const createReservation = async (req, res) => {
             success: true,
             message: 'Reserva creada exitosamente',
             data: reservation
-        })
+        });
 
     } catch (error) {
         res.status(400).json({
             success: false,
             message: 'Error al crear reservación',
             error: error.message
-        })
+        });
     }
-}
+};
 
 export const getReservations = async (req, res) => {
     try {
@@ -121,10 +181,10 @@ export const updateReservation = async (req, res) => {
         });
 
         const notifMap = {
-            CONFIRMADA: { type: 'RESERVACION_CONFIRMADA', title: 'Reservación confirmada',  message: 'Tu reservación ha sido confirmada. ¡Te esperamos!' },
-            CANCELADA:  { type: 'RESERVACION_CANCELADA',  title: 'Reservación cancelada',    message: 'Tu reservación ha sido cancelada.' },
-            COMPLETADA: { type: 'RESERVACION_COMPLETADA', title: 'Reservación completada',   message: 'Gracias por visitarnos. ¡Esperamos verte pronto!' },
-            NO_ASISTIO: { type: 'RESERVACION_NO_ASISTIO', title: 'Reservación: no asistió',  message: 'Registramos que no pudiste asistir a tu reservación.' },
+            CONFIRMADA: { type: 'RESERVACION_CONFIRMADA', title: 'Reservación confirmada', message: 'Tu reservación ha sido confirmada. ¡Te esperamos!' },
+            CANCELADA: { type: 'RESERVACION_CANCELADA', title: 'Reservación cancelada', message: 'Tu reservación ha sido cancelada.' },
+            COMPLETADA: { type: 'RESERVACION_COMPLETADA', title: 'Reservación completada', message: 'Gracias por visitarnos. ¡Esperamos verte pronto!' },
+            NO_ASISTIO: { type: 'RESERVACION_NO_ASISTIO', title: 'Reservación: no asistió', message: 'Registramos que no pudiste asistir a tu reservación.' },
         };
 
         if (updateData.status && notifMap[updateData.status]) {
@@ -166,7 +226,7 @@ export const changeReservationStatus = async (req, res) => {
             { new: true }
         );
 
-        if (!reservation) { 
+        if (!reservation) {
             return res.status(404).json({
                 success: false,
                 message: 'Reservación no encontrada',
