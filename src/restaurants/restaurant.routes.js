@@ -23,7 +23,7 @@ router.post("/create",
   createRestaurante
 );
 
-router.get("/get", getRestaurantes);
+router.get("/get", validateJWT, getRestaurantes);
 
 router.get(
   '/activity/:id',
