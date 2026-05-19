@@ -72,6 +72,30 @@ export const validateCreateEvent = [
     body('dateTime')
         .notEmpty()
         .withMessage('La fecha del evento es obligatoria'),
+    body('assignedTables')
+        .optional()
+        .isArray()
+        .withMessage('Las mesas asignadas deben ser un arreglo'),
+    body('assignedTables.*')
+        .optional()
+        .isMongoId()
+        .withMessage('Cada mesa debe ser un ID válido'),
+    body('specialDishes')
+        .optional()
+        .isArray()
+        .withMessage('Los platos especiales deben ser un arreglo'),
+    body('specialDishes.*')
+        .optional()
+        .isMongoId()
+        .withMessage('Cada plato debe ser un ID válido'),
+    body('assignedEmployees')
+        .optional()
+        .isArray()
+        .withMessage('Los empleados asignados deben ser un arreglo'),
+    body('assignedEmployees.*')
+        .optional()
+        .isMongoId()
+        .withMessage('Cada empleado debe ser un ID válido'),
     checkValidators,
 ];
 
@@ -112,8 +136,33 @@ export const validateUpdateEventRequest = [
         .notEmpty()
         .withMessage('El ID del restaurante es obligatorio'),
     body('dateTime')
+        .optional()
         .notEmpty()
-        .withMessage('La fecha del evento es obligatoria'),
+        .withMessage('La fecha del evento no puede estar vacía'),
+    body('assignedTables')
+        .optional()
+        .isArray()
+        .withMessage('Las mesas asignadas deben ser un arreglo'),
+    body('assignedTables.*')
+        .optional()
+        .isMongoId()
+        .withMessage('Cada mesa debe ser un ID válido'),
+    body('specialDishes')
+        .optional()
+        .isArray()
+        .withMessage('Los platos especiales deben ser un arreglo'),
+    body('specialDishes.*')
+        .optional()
+        .isMongoId()
+        .withMessage('Cada plato debe ser un ID válido'),
+    body('assignedEmployees')
+        .optional()
+        .isArray()
+        .withMessage('Los empleados asignados deben ser un arreglo'),
+    body('assignedEmployees.*')
+        .optional()
+        .isMongoId()
+        .withMessage('Cada empleado debe ser un ID válido'),
     checkValidators,
 ];
 

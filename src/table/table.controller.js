@@ -1,6 +1,22 @@
 import Table from './table.model.js';
 import Restaurant from '../restaurants/restaurant.model.js';
 
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
+
 export const createTable = async (req, res) => {
     try {
         console.log("BODY QUE LLEGA:", req.body);
@@ -26,9 +42,14 @@ export const createTable = async (req, res) => {
 
 export const getTables = async (req, res) => {
     try {
-        const { page = 1, limit = 10, isActive = true, restaurante } = req.query;
+        const { page = 1, limit = 10, isActive, restaurante } = req.query;
 
-        const filter = { isActive };
+        const filter = {};
+        const normalizedIsActive = parseActiveFilter(isActive);
+
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        }
         
         if (restaurante) {
             filter.restaurante = restaurante;
@@ -196,7 +217,7 @@ export const changeTableAvailability = async (req, res) => {
 export const getTablesByRestaurant = async (req, res) => {
     try {
         const { restaurantId } = req.params;
-        const { page = 1, limit = 10, isActive = true } = req.query;
+        const { page = 1, limit = 10, isActive } = req.query;
 
         const restaurantExists = await Restaurant.findById(restaurantId);
         if (!restaurantExists) {
@@ -206,7 +227,12 @@ export const getTablesByRestaurant = async (req, res) => {
             });
         }
 
-        const filter = { restaurant: restaurantId, isActive };
+        const filter = { restaurant: restaurantId };
+        const normalizedIsActive = parseActiveFilter(isActive);
+
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        }
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         const [tables, total] = await Promise.all([

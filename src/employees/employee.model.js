@@ -9,6 +9,10 @@ const employeeSchema = new mongoose.Schema({
         required: [true, 'El ID del AuthService es obligatorio'],
         unique: true
     },
+    fullName: {
+        type: String,
+        required: [true, 'El nombre completo del empleado es obligatorio']
+    },
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Restaurant',

@@ -6,6 +6,10 @@ export const createDish = async (req, res) => {
 
         const dishData = req.body;
 
+        if (dishData.ingredients && typeof dishData.ingredients === 'string') {
+            dishData.ingredients = JSON.parse(dishData.ingredients);
+        }
+
         if (!dishData.restaurant) {
             return res.status(400).json({
                 success: false,
@@ -20,7 +24,7 @@ export const createDish = async (req, res) => {
                 message: 'El restaurante proporcionado no existe'
             });
         }
-        if (req.file){
+        if (req.file) {
             dishData.photo = req.file.path;
         }
 
@@ -44,8 +48,23 @@ export const createDish = async (req, res) => {
 export const getDishes = async (req, res) => {
     try {
 
-        const { page = 1, limit = 10, isActive = true } = req.query;
-        const filter = { isActive };
+        const { page = 1, limit = 10, isActive, search = '', dishType = '' } = req.query;
+
+        const filter = {};
+        if (isActive !== undefined) {
+            filter.isActive = isActive === 'true';
+        }
+
+        if (search) {
+            filter.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        if (dishType) {
+            filter.dishType = dishType;
+        }
 
         const options = {
             page: parseInt(page),
@@ -54,18 +73,19 @@ export const getDishes = async (req, res) => {
         };
 
         const dishes = await Dish.find(filter)
+            .populate({ path: 'restaurant', model: 'Restaurante', select: 'name' })
             .limit(options.limit)
             .skip((options.page - 1) * options.limit)
             .sort(options.sort);
 
-            const total = await Dish.countDocuments(filter);
+        const total = await Dish.countDocuments(filter);
 
         res.status(200).json({
             success: true,
             data: dishes,
             pagination: {
                 currentPage: options.page,
-                totalPages: Math.ceil(total / limit),
+                totalPages: Math.ceil(total / options.limit),
                 totalRecords: total,
                 limit: options.limit
             }
@@ -98,7 +118,7 @@ export const getDishById = async (req, res) => {
             message: 'Platillo obtenido exitosamente',
             data: dish
         });
-        
+
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -115,7 +135,11 @@ export const updateDish = async (req, res) => {
         const dishId = req.params.id;
         const updateData = req.body;
 
-        if (req.file){
+        if (updateData.ingredients && typeof updateData.ingredients === 'string') {
+            updateData.ingredients = JSON.parse(updateData.ingredients);
+        }
+
+        if (req.file) {
             updateData.photo = req.file.path;
         }
 
@@ -133,7 +157,7 @@ export const updateDish = async (req, res) => {
             message: 'Platillo actualizado exitosamente',
             data: updatedDish
         });
-        
+
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -162,7 +186,7 @@ export const changeDishStatus = async (req, res) => {
             message: `Platillo ${isActive ? 'activado' : 'desactivado'} exitosamente`,
             data: updatedDish
         });
-        
+
     } catch (error) {
         res.status(500).json({
             success: false,

@@ -37,6 +37,7 @@ const notificationSchema = new mongoose.Schema(
         referenceId: {
             type: mongoose.Schema.Types.ObjectId,
             required: [true, 'La referencia es requerida'],
+            refPath: 'referenceType'
         },
         referenceType: {
             type: String,

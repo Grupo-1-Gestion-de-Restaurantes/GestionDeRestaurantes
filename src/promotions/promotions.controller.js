@@ -1,5 +1,21 @@
 import Promotions from "./promotions.model.js";
 
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
+
 export const createPromotion = async (req, res) => {
     try {
         const promotionData = req.body;
@@ -21,8 +37,13 @@ export const createPromotion = async (req, res) => {
 
 export const getPromotion = async (req, res) => {
     try {
-        const { page = 1, limit = 10, isActive = true } = req.query;
-        const filter = { isActive };
+        const { page = 1, limit = 10, isActive } = req.query;
+        const filter = {};
+        const normalizedIsActive = parseActiveFilter(isActive);
+
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        }
 
         const options = {
             page: parseInt(page),

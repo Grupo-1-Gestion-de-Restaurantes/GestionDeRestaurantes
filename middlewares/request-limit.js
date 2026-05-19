@@ -2,7 +2,7 @@ import rateLimit from 'express-rate-limit';
 
 export const requestLimit = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // Límite de 100 requests por ventana de tiempo por IP
+    max: 1000, // Límite de 1000 requests por ventana de tiempo por IP (Aumentado para desarrollo)
     message: {
         success: false,
         message: 'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde.',

@@ -49,7 +49,7 @@ export const validateCreateRestaurant = [
         .optional(),
     body('status')
         .optional()
-        .isIn(['Gourmet', 'Casual'])
+        .isIn(['Abierto', 'Cerrado', 'En Mantenimiento'])
         .withMessage('El estado no es valido'),
     body('rating')
         .optional()
@@ -70,21 +70,18 @@ export const validateUpdateRetaurantRequest = [
         .isMongoId()
         .withMessage('ID debe ser un ObjectId válido de MongoDB'),
     body('name')
+        .optional()
         .trim()
-        .notEmpty()
-        .withMessage('El nombre del restaurnate es requerido')
         .isLength({ min: 2, max: 100 })
         .withMessage('El nombre debe tener entre 2 y 100 caracteres'),
     body('address')
+        .optional()
         .trim()
-        .notEmpty()
-        .withMessage('La direccion es obligatoria')
         .isLength({min: 5, max: 100 })
         .withMessage('La direccion debe tener entre 5 y 100 caracteres'),
     body('categories')
+        .optional()
         .trim()
-        .notEmpty()
-        .withMessage('La categoria es requerida')
         .isIn(['Gourmet', 'Casual'])
         .withMessage('Categoria no es valida'),
     body('description')
@@ -93,29 +90,36 @@ export const validateUpdateRetaurantRequest = [
         .isLength({ max: 200 })
         .withMessage('La descripcion no puede exceder 200 caracteres'),
     body('openingTime')
+        .optional()
         .trim()
-        .notEmpty()
-        .withMessage('La hora de apertura es obligatoria'),
+        .matches(/^([01]\d|2[0-3]):([0-5]\d)$/)
+        .withMessage('Usa el formato HH:mm (ej: 09:30)'),
     body('closingTime')
+        .optional()
         .trim()
-        .notEmpty()
-        .withMessage('La hora de cierre es obligatoria'),
+        .matches(/^([01]\d|2[0-3]):([0-5]\d)$/)
+        .withMessage('Usa el formato HH:mm (ej: 22:00)'),
     body('averagePrice')
         .optional()
-        .isLength({ min: 0})
+        .isFloat({ min: 0 })
         .withMessage('El precio promedio no puede ser negativo'),
     body('phone')
+        .optional()
         .trim()
-        .notEmpty()
-        .withMessage('El numero de telefono es obligatorio'),
+        .matches(/^[0-9]{8,15}$/)
+        .withMessage('Ingrese un número de teléfono válido'),
     body('status')
         .optional()
-        .isIn(['Gourmet', 'Casual'])
+        .isIn(['Abierto', 'Cerrado', 'En Mantenimiento'])
         .withMessage('El estado no es valido'),
     body('rating')
         .optional()
-        .isLength({ min: 1, max: 5 })
+        .isFloat({ min: 1, max: 5 })
         .withMessage('La calificacion no puede ser menor que 1, ni mayor que 5'),
+    body('capacity')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('La capacidad no puede ser menor a 1'),
     checkValidators,
 ];
 

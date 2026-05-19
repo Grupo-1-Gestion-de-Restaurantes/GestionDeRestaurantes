@@ -17,7 +17,7 @@ router.get('/:id',
     validateGetInventoryById,
     getInventoryById);
 
-router.patch('/:id/status',
+router.put('/:id/status',
     validateChangeInventoryItemStatus,
     changeInventoryItemStatus);
 
@@ -25,7 +25,7 @@ router.put('/:id',
     validateUpdateInventoryItem,
     updateInventoryItem);
 
-router.patch('/:id/stock',
+router.put('/:id/stock',
     validateUpdateInventoryStock,
     updateInventoryStock);
 

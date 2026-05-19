@@ -3,7 +3,7 @@ import Client from './client.model.js';
 
 export const createClient = async (req, res) => {
     try {
-        const client = req.user; 
+        const client = req.user;
 
         if (client.phone && client.birthdate) {
             return res.status(400).json({
@@ -44,9 +44,21 @@ export const createClient = async (req, res) => {
 export const getClients = async (req, res) => {
 
     try {
-        const { page = 1, limit = 10, isActive = true } = req.query;
+        const { page = 1, limit = 10, isActive, search = '' } = req.query;
 
-        const filter = { isActive };
+        const filter = {};
+        if (isActive !== undefined) {
+            filter.isActive = isActive === 'true';
+        }
+
+        if (search) {
+            filter.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { surname: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } },
+                { phone: { $regex: search, $options: 'i' } }
+            ];
+        }
 
         const options = {
             page: parseInt(page),
@@ -55,8 +67,8 @@ export const getClients = async (req, res) => {
         }
 
         const clients = await Client.find(filter)
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
+            .limit(options.limit)
+            .skip((options.page - 1) * options.limit)
             .sort(options.sort);
 
         const total = await Client.countDocuments(filter);

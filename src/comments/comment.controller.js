@@ -42,9 +42,22 @@ export const createComment = async (req, res) => {
 
 export const getComments = async (req, res) => {
     try {
-        const { page = 1, limit = 10, isActive = true } = req.query;
+        const { page = 1, limit = 10, isActive, search = '', restaurantId } = req.query;
 
-        const filter = { isActive };
+        const filter = {};
+        if (isActive !== undefined) {
+            filter.isActive = isActive === 'true';
+        }
+
+        if (restaurantId) {
+            filter.restaurantId = restaurantId;
+        }
+
+        if (search) {
+            filter.$or = [
+                { text: { $regex: search, $options: 'i' } }
+            ];
+        }
 
         const options = {
             page: parseInt(page),
@@ -53,8 +66,10 @@ export const getComments = async (req, res) => {
         }
 
         const comments = await Comment.find(filter)
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
+            .populate({ path: 'restaurantId', model: 'Restaurante', select: 'name' })
+            .populate({ path: 'clientId', model: 'Client', select: 'name' })
+            .limit(options.limit)
+            .skip((options.page - 1) * options.limit)
             .sort(options.sort);
 
         const total = await Comment.countDocuments(filter);
@@ -63,11 +78,10 @@ export const getComments = async (req, res) => {
             success: true,
             data: comments,
             pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: options.page,
+                totalPages: Math.ceil(total / options.limit),
                 totalRecords: total,
-                limit,
-                comments
+                limit: options.limit
             }
         })
     } catch (error) {
