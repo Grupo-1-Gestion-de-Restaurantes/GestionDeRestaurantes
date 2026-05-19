@@ -6,7 +6,7 @@ import { requireRole } from './validate-role.js';
 
 export const validateCreateOrder = [
     validateJWT,
-    requireRole('CLIENT_ROLE'),
+    requireRole('CLIENT_ROLE', 'USER_ROLE'),
     syncClient,
     body('restaurantId')
         .notEmpty().withMessage('El ID del restaurante es obligatorio')

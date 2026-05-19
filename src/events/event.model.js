@@ -39,7 +39,7 @@ const eventSchema = new mongoose.Schema({
     ],
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Restaurant',
+        ref: 'Restaurante',
         required: [true, 'El restaurante del evento es obligatorio']
     },
     assignedTables: [{
@@ -78,10 +78,6 @@ const eventSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true
-    },
-    photo: {
-        type: String,
-        default: 'https://res.cloudinary.com/degzwfdz3/image/upload/v1771700198/no-photo_orrdvt.avif',
     }
 }, {
     timestamps: true,

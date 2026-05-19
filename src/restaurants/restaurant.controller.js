@@ -48,9 +48,9 @@ export const createRestaurante = async (req, res) => {
 
 export const getRestaurantes = async (req, res) => {
   try {
-    const { page = 1, limit = 10, isActive, search = '',  city, rating, categories} = req.query;
+    const { page = 1, limit = 20, isActive, search = '',  city, rating, categories} = req.query;
 
-    const filter = { isActive };
+    const filter = {};
 
     if (city) {
       filter.city = { $regex: city, $options: 'i' };
@@ -64,17 +64,14 @@ export const getRestaurantes = async (req, res) => {
       filter.categories = categories;
     }
 
-    const options = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sort: { createdAt: -1 }
-    }
     const normalizedIsActive = parseActiveFilter(isActive);
-    const filter = {};
     const normalizedSearch = String(search).trim();
 
     if (normalizedIsActive !== undefined) {
       filter.isActive = normalizedIsActive;
+    } else if (isActive === undefined) {
+      // Por defecto mostrar solo activos si no se especifica nada
+      filter.isActive = true;
     }
 
     if (normalizedSearch) {
@@ -87,7 +84,7 @@ export const getRestaurantes = async (req, res) => {
     }
 
     const parsedPage = parseInt(page, 10) || 1;
-    const parsedLimit = parseInt(limit, 10) || 10;
+    const parsedLimit = parseInt(limit, 10) || 20;
 
     const restaurantes = await Restaurante.find(filter)
       .limit(parsedLimit)
@@ -103,8 +100,7 @@ export const getRestaurantes = async (req, res) => {
         currentPage: parsedPage,
         totalPages: Math.ceil(total / parsedLimit),
         totalRecords: total,
-        limit: parsedLimit,
-        restaurantes
+        limit: parsedLimit
       }
     })
   } catch (error) {

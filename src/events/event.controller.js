@@ -1,6 +1,22 @@
 import Event from './event.model.js';
 import Promotion from '../promotions/promotions.model.js';
 
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
+
 export const createEvent = async (req, res) => {
     try {
         const { activePromotions } = req.body;
@@ -53,19 +69,25 @@ export const createEvent = async (req, res) => {
 export const getEvents = async (req, res) => {
     try {
 
-        const { page = 1, limit = 10, isActive = true } = req.query;
-        const filter = { isActive };
+        const { page = 1, limit = 20, isActive, restaurant } = req.query;
+        const filter = {};
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
-        };
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
+        }
+
+        if (restaurant) filter.restaurant = restaurant;
+
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
 
         const events = await Event.find(filter)
-            .limit(options.limit)
-            .skip((options.page - 1) * options.limit)
-            .sort(options.sort);
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Event.countDocuments(filter);
 
@@ -73,10 +95,10 @@ export const getEvents = async (req, res) => {
             success: true,
             data: events,
             pagination: {
-                currentPage: options.page,
-                totalPages: Math.ceil(total / options.limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit: options.limit
+                limit: parsedLimit
             }
         });
 

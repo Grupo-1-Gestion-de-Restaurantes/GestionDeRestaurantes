@@ -15,7 +15,7 @@ const restaurantSchema = mongoose.Schema(
     address: {
       type: String,
       required: [true, "La dirección es obligatoria"],
-      uniuque: true,
+      unique: true,
       trim: true
     },
 

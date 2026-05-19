@@ -16,11 +16,17 @@ export const validatePartnerLead = [
         .notEmpty().withMessage('El teléfono es obligatorio'),
     body('cityAddress')
         .trim()
-        .notEmpty().withMessage('La ciudad/dirección es obligatoria'),
-    body('branches')
-        .isInt({ min: 1 }).withMessage('El número de sucursales debe ser al menos 1'),
-    body('cuisine')
+        .notEmpty().withMessage('La dirección es obligatoria'),
+    body('city')
         .trim()
-        .notEmpty().withMessage('El tipo de cocina es obligatorio'),
+        .notEmpty().withMessage('La ciudad es obligatoria'),
+    body('capacity')
+        .isInt({ min: 1 }).withMessage('La capacidad debe ser al menos 1'),
+    body('categories')
+        .isIn(['Gourmet', 'Casual']).withMessage('Categoría inválida'),
+    body('openingTime')
+        .matches(/^([01]\d|2[0-3]):([0-5]\d)$/).withMessage('Formato de hora de apertura inválido (HH:mm)'),
+    body('closingTime')
+        .matches(/^([01]\d|2[0-3]):([0-5]\d)$/).withMessage('Formato de hora de cierre inválido (HH:mm)'),
     checkValidators
 ];

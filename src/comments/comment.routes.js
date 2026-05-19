@@ -62,9 +62,8 @@ router.put(
 );
 
 router.put(
-    '/desactivate/:id', 
+    '/deactivate/:id',
     validateCommentStatusChange,
     changeCommentStatus
 );
-
 export default router;

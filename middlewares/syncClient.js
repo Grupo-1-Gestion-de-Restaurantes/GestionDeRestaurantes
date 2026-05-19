@@ -22,11 +22,7 @@ export const syncClient = async (req, res, next) => {
                     isActive: true
                 }
             },
-<<<<<<< Updated upstream
-            { upsert: true, new: true, runValidators: false, lean: true } 
-=======
-            { upsert: true, returnDocument: 'after', runValidators: false } 
->>>>>>> Stashed changes
+            { upsert: true, new: true, runValidators: false, lean: true, returnDocument: 'after'} 
         );
 
         req.user = { ...user, role };

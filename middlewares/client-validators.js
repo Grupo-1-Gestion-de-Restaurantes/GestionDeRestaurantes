@@ -39,7 +39,7 @@ export const validateCreateClient = [
 
 export const validateUpdateClientRequest = [
     validateJWT,
-    requireRole('ADMIN_ROLE', 'CLIENT_ROLE'),
+    requireRole('ADMIN_ROLE', 'CLIENT_ROLE', 'USER_ROLE'),
     syncClient,
     body('name')
         .optional()
@@ -49,13 +49,8 @@ export const validateUpdateClientRequest = [
     body('phone')
         .optional()
         .trim()
-<<<<<<< Updated upstream
         .matches(/^[0-9]{7,15}$/)
         .withMessage('Teléfono inválido'),
-=======
-        .matches(/^[0-9]{8,15}$/)
-        .withMessage('Teléfono inválido (debe tener entre 8 y 15 dígitos)'),
->>>>>>> Stashed changes
     body('birthdate')
         .optional()
         .isISO8601()

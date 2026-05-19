@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import Promotions from "./promotions.model.js";
+import Dish from "../dishes/dish.model.js";
 
 const parseActiveFilter = (value) => {
     if (value === undefined || value === null || value === '' || value === 'all') {
@@ -37,42 +39,55 @@ export const createPromotion = async (req, res) => {
 
 export const getPromotion = async (req, res) => {
     try {
-<<<<<<< Updated upstream
-        const { page = 1, limit = 10, isActive } = req.query;
+        const { page = 1, limit = 20, isActive, restaurant, scope, dishId, dishType } = req.query;
         const filter = {};
         const normalizedIsActive = parseActiveFilter(isActive);
 
         if (normalizedIsActive !== undefined) {
             filter.isActive = normalizedIsActive;
-=======
-        const { page = 1, limit = 10, isActive = true, restaurant } = req.query;
-        const filter = { isActive: isActive === 'true' || isActive === true };
+        }
 
-        if (restaurant) {
+        if (restaurant && mongoose.Types.ObjectId.isValid(restaurant)) {
             filter.restaurant = restaurant;
->>>>>>> Stashed changes
         }
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
+        if (scope) {
+            filter.scope = scope;
         }
+
+        if (dishId && mongoose.Types.ObjectId.isValid(dishId)) {
+            filter.$or = [
+                { dishesApplicables: { $size: 0 } },
+                { dishesApplicables: dishId }
+            ];
+        } else if (dishType) {
+            const applicableDishes = await Dish.find({ dishType }).select('_id');
+            const dishIds = applicableDishes.map(d => d._id);
+            filter.$or = [
+                { dishesApplicables: { $size: 0 } },
+                { dishesApplicables: { $in: dishIds } }
+            ];
+        }
+
+        const parsedPage = Math.max(1, parseInt(page) || 1);
+        const parsedLimit = Math.max(1, parseInt(limit) || 20);
+
         const promotions = await Promotions.find(filter)
-            //.populate('promotions', 'name')
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
-            .sort(options.sort);
+            .populate('restaurant', 'name')
+            .populate('dishesApplicables', 'name')
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Promotions.countDocuments(filter);
         res.status(200).json({
             success: true,
             data: promotions,
             pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit
+                limit: parsedLimit
             }
         });
     } catch (error) {
@@ -81,7 +96,6 @@ export const getPromotion = async (req, res) => {
             message: 'Error al obtener las promociones',
             error: error.message
         });
-
     }
 };
 

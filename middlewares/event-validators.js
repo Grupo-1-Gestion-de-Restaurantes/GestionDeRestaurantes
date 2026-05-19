@@ -187,7 +187,7 @@ export const validateGetEventById = [
 
 export const validateSuscribeToEvent = [
     validateJWT,
-    requireRole('CLIENT_ROLE'),
+    requireRole('CLIENT_ROLE', 'USER_ROLE'),
     param('id')
         .isMongoId()
         .withMessage('ID debe ser un ObjectId válido de MongoDB'),

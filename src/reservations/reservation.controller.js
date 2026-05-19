@@ -3,6 +3,22 @@ import Restaurant from '../restaurants/restaurant.model.js';
 import Table from '../table/table.model.js';
 import { notificationService } from '../notifications/notification.service.js';
 
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
+
 export const createReservation = async (req, res) => {
     try {
 
@@ -97,34 +113,42 @@ export const createReservation = async (req, res) => {
 
 export const getReservations = async (req, res) => {
     try {
-        const { page = 1, limit = 10, isActive = true } = req.query;
+        const { page = 1, limit = 20, isActive, restaurant } = req.query;
 
-        const filter = { isActive };
+        const filter = {};
+        const normalizedIsActive = parseActiveFilter(isActive);
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
         }
 
+        if (restaurant) {
+            filter.restaurant = restaurant;
+        }
 
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
 
-        const reservation = await Reservation.find()
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
-            .sort(options.sort);
+        const reservations = await Reservation.find(filter)
+            .populate('restaurant', 'name')
+            .populate('table', 'tableNumber')
+            .populate('client', 'name email')
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
-        const total = await Reservation.countDocuments();
+        const total = await Reservation.countDocuments(filter);
 
         res.status(200).json({
             success: true,
-            data: reservation,
+            data: reservations,
             pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit,
-                reservation
+                limit: parsedLimit
             }
         })
     } catch (error) {

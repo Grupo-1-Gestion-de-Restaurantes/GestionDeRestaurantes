@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Order from "./order.model.js";
 import Dish from "../dishes/dish.model.js";
 import Restaurant from "../restaurants/restaurant.model.js";
@@ -8,6 +9,22 @@ import InventoryItem from "../inventories/inventory.model.js";
 import Promotion from "../promotions/promotions.model.js";
 import { notificationService } from '../notifications/notification.service.js';
 import Client from "../client/client.model.js";
+
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
 
 const ORDER_NOTIFICATION_MAP = {
     CONFIRMADO: {
@@ -67,20 +84,26 @@ export const createOrder = async (req, res) => {
         // --- Lógica de Promoción ---
         let activePromo = null;
         if (promotion) {
-            activePromo = await Promotion.findOne({
-                _id: promotion,
-                restaurant: restaurantId,
-                isActive: true,
-                status: 'APPROVED',
-                startDate: { $lte: new Date() },
-                endDate: { $gte: new Date() }
-            });
-            if (!activePromo) throw new Error("La promoción no es válida o ha expirado");
+            const basicFilter = mongoose.Types.ObjectId.isValid(promotion) 
+                ? { _id: promotion } 
+                : { title: promotion };
+            
+            const promo = await Promotion.findOne(basicFilter);
+
+            if (!promo) throw new Error("La promoción no es válida o no existe");
+            if (promo.restaurant.toString() !== restaurantId.toString()) throw new Error("Esta promoción no aplica a este restaurante");
+            if (promo.scope === 'EVENTOS') throw new Error("Esta promoción es exclusiva para eventos y no aplica a pedidos");
+            if (!promo.isActive || promo.status !== 'APPROVED') throw new Error("La promoción no se encuentra activa");
+            
+            const now = new Date();
+            if (now < promo.startDate || now > promo.endDate) throw new Error("La promoción ha expirado o aún no ha comenzado");
+            
+            activePromo = promo;
 
             if (activePromo.isOneTimeUse) {
                 const alreadyUsed = await Order.findOne({ 
                     client: client._id, 
-                    promotion: promotion,
+                    promotion: activePromo._id,
                     status: { $ne: 'CANCELADO' }
                 });
                 if (alreadyUsed) throw new Error("Ya has utilizado esta promoción anteriormente");
@@ -89,6 +112,8 @@ export const createOrder = async (req, res) => {
 
         // --- Hidratación de Items y Validación de Stock ---
         let totalOrder = 0;
+        let promoAppliedCount = 0;
+
         const hydratedItems = await Promise.all(items.map(async (item) => {
             const dish = await Dish.findOne({
                 _id: item.dishId,
@@ -121,8 +146,14 @@ export const createOrder = async (req, res) => {
                 });
             }
 
-            if (activePromo && activePromo.dishesApplicables.includes(dish._id)) {
-                subtotal -= subtotal * (activePromo.discountPercentage / 100);
+            if (activePromo) {
+                const isApplicable = activePromo.dishesApplicables.length === 0 || 
+                                    activePromo.dishesApplicables.some(id => id.toString() === dish._id.toString());
+                
+                if (isApplicable) {
+                    subtotal -= subtotal * (activePromo.discountPercentage / 100);
+                    promoAppliedCount++;
+                }
             }
 
             totalOrder += subtotal;
@@ -135,6 +166,10 @@ export const createOrder = async (req, res) => {
                 subtotal: subtotal
             };
         }));
+
+        if (activePromo && promoAppliedCount === 0 && activePromo.dishesApplicables.length > 0) {
+            throw new Error("La promoción no es aplicable a ninguno de los platos seleccionados");
+        }
 
         // --- Descontar Stock ---
         if (stockDeductions.length > 0) {
@@ -188,7 +223,7 @@ export const createOrder = async (req, res) => {
             total: totalOrder,
             deliveryAddress: finalAddress,
             paymentMethod,
-            promotion: promotion || null
+            promotion: activePromo ? activePromo._id : null
         });
 
         const savedOrder = await newOrder.save();
@@ -329,7 +364,6 @@ export const updateOrderStatus = async (req, res) => {
         const normalizedStatus = status.toUpperCase();
 
         if (normalizedStatus === 'CANCELADO') {
-<<<<<<< Updated upstream
             const orderClientId = order.client?.toString();
             const authUserId = (user.uid || user._id || user.id)?.toString();
 
@@ -346,13 +380,6 @@ export const updateOrderStatus = async (req, res) => {
                         message: "No puedes cancelar un pedido que ya está en proceso o entregado"
                     });
                 }
-=======
-            if (order.client.toString() !== user._id.toString()) {
-                return res.status(403).json({ success: false, message: "No tienes permiso para cancelar este pedido" });
-            }
-            if (order.status !== 'PENDIENTE') {
-                return res.status(400).json({ success: false, message: "No puedes cancelar un pedido que ya está en proceso" });
->>>>>>> Stashed changes
             }
         }
 
@@ -565,18 +592,28 @@ export const updateOrderAdmin = async (req, res) => {
 
 export const getOrders = async (req, res) => {
     try {
-        const { page = 1, limit = 10, restaurante } = req.query;
-        const filter = { isActive: true };
+        const { page = 1, limit = 20, restaurante, isActive } = req.query;
+        const filter = {};
+
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
+        }
 
         if (restaurante) {
             filter.restaurant = restaurante;
         }
         
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+
         const orders = await Order.find(filter)
             .populate('client', 'name email') 
             .populate('restaurant', 'name')
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
             .sort({ createdAt: -1 });
 
         const total = await Order.countDocuments(filter);
@@ -586,9 +623,9 @@ export const getOrders = async (req, res) => {
             data: orders,
             pagination: {
                 totalRecords: total,
-                totalPages: Math.ceil(total / limit),
-                currentPage: parseInt(page),
-                limit: parseInt(limit)
+                totalPages: Math.ceil(total / parsedLimit),
+                currentPage: parsedPage,
+                limit: parsedLimit
             }
         });
     } catch (error) {
@@ -613,6 +650,16 @@ export const deleteOrder = async (req, res) => {
             return res.status(404).json({ success: false, message: "Pedido no encontrado" });
         }
 
+        // Restaurar notificación de cancelación
+        await notificationService.createAndEmit(
+            String(updatedOrder.client),
+            ORDER_NOTIFICATION_MAP.CANCELADO.type,
+            ORDER_NOTIFICATION_MAP.CANCELADO.title,
+            ORDER_NOTIFICATION_MAP.CANCELADO.message,
+            updatedOrder._id,
+            'Order'
+        );
+
         res.status(200).json({
             success: true,
             message: "Pedido cancelado correctamente",
@@ -625,67 +672,4 @@ export const deleteOrder = async (req, res) => {
             error: error.message
         });
     }
-<<<<<<< Updated upstream
 };
-=======
-};
-
-export const createOrderAdmin = async (req, res) => {
-    try {
-        const { clientId, restaurantId, items, paymentMethod, deliveryAddress } = req.body;
-
-        const client = await Client.findById(clientId);
-        if (!client) {
-            return res.status(404).json({ success: false, message: "Cliente no encontrado" });
-        }
-
-        const restaurant = await Restaurant.findById(restaurantId);
-        if (!restaurant) {
-            return res.status(404).json({ success: false, message: "Restaurante no encontrado" });
-        }
-
-        let totalOrder = 0;
-        const hydratedItems = await Promise.all(items.map(async (item) => {
-            const dish = await Dish.findOne({ _id: item.dishId, restaurant: restaurantId, isActive: true });
-            if (!dish) throw new Error(`Plato ${item.dishId} no disponible`);
-            const subtotal = dish.price * item.quantity;
-            totalOrder += subtotal;
-            return {
-                productId: dish._id,
-                name: dish.name,
-                price: dish.price,
-                quantity: item.quantity,
-                subtotal: subtotal
-            };
-        }));
-
-        const newOrder = new Order({
-            client: clientId,
-            restaurant: restaurantId,
-            items: hydratedItems,
-            total: totalOrder,
-            deliveryAddress: {
-                alias: deliveryAddress?.alias || "Otro",
-                addressLine: deliveryAddress?.addressLine || "Admin Created",
-            },
-            paymentMethod,
-            status: "CONFIRMADO"
-        });
-
-        const savedOrder = await newOrder.save();
-
-        res.status(201).json({
-            success: true,
-            message: "Orden admin creada",
-            order: savedOrder
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: "Error en orden admin",
-            error: error.message
-        });
-    }
-};
->>>>>>> Stashed changes

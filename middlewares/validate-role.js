@@ -16,12 +16,21 @@ export const requireRole = (...allowedRoles) => {
 
     const userRole = req.user.role;
 
-    if (!allowedRoles.includes(userRole)) {
+    // Normalización: Si se pide CLIENT_ROLE o USER_ROLE, permitimos cualquiera de los dos para mayor compatibilidad
+    let effectiveAllowedRoles = [...allowedRoles];
+    if (allowedRoles.includes('CLIENT_ROLE') && !effectiveAllowedRoles.includes('USER_ROLE')) {
+      effectiveAllowedRoles.push('USER_ROLE');
+    }
+    if (allowedRoles.includes('USER_ROLE') && !effectiveAllowedRoles.includes('CLIENT_ROLE')) {
+      effectiveAllowedRoles.push('CLIENT_ROLE');
+    }
+
+    if (!effectiveAllowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para acceder a este recurso',
         error: 'FORBIDDEN',
-        requiredRole: allowedRoles,
+        requiredRole: effectiveAllowedRoles,
         yourRole: userRole,
       });
     }

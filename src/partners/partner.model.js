@@ -26,16 +26,34 @@ const partnerLeadSchema = mongoose.Schema(
     },
     cityAddress: {
       type: String,
-      required: [true, "La ciudad/dirección es obligatoria"]
+      required: [true, "La dirección es obligatoria"]
     },
-    branches: {
+    city: {
+      type: String,
+      required: [true, "La ciudad es obligatoria"],
+      default: "Guatemala"
+    },
+    capacity: {
       type: Number,
-      required: [true, "El número de sucursales es obligatorio"],
+      required: [true, "La capacidad es obligatoria"],
       min: 1
     },
-    cuisine: {
+    categories: {
       type: String,
-      required: [true, "El tipo de cocina es obligatorio"]
+      required: [true, "La categoría es obligatoria"],
+      enum: ["Gourmet", "Casual"]
+    },
+    openingTime: {
+      type: String,
+      required: [true, "La hora de apertura es obligatoria"]
+    },
+    closingTime: {
+      type: String,
+      required: [true, "La hora de cierre es obligatoria"]
+    },
+    userId: {
+      type: String,
+      required: [true, "El ID del usuario es obligatorio"]
     },
     message: {
       type: String,

@@ -55,7 +55,7 @@ export const getComments = async (req, res) => {
 
         if (search) {
             filter.$or = [
-                { text: { $regex: search, $options: 'i' } }
+                { comment: { $regex: search, $options: 'i' } }
             ];
         }
 

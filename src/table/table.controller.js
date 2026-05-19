@@ -42,30 +42,29 @@ export const createTable = async (req, res) => {
 
 export const getTables = async (req, res) => {
     try {
-        const { page = 1, limit = 10, isActive, restaurante } = req.query;
+        const { page = 1, limit = 20, isActive, restaurante } = req.query;
 
         const filter = {};
         const normalizedIsActive = parseActiveFilter(isActive);
 
         if (normalizedIsActive !== undefined) {
             filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
         }
         
         if (restaurante) {
-            filter.restaurante = restaurante;
+            filter.restaurant = restaurante;
         }
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
-        };
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
 
         const tables = await Table.find(filter)
             .populate('restaurant', 'name')
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
-            .sort(options.sort);
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Table.countDocuments(filter);
 
@@ -73,10 +72,10 @@ export const getTables = async (req, res) => {
             success: true,
             data: tables,
             pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit
+                limit: parsedLimit
             }
         });
     } catch (error) {
@@ -217,7 +216,7 @@ export const changeTableAvailability = async (req, res) => {
 export const getTablesByRestaurant = async (req, res) => {
     try {
         const { restaurantId } = req.params;
-        const { page = 1, limit = 10, isActive } = req.query;
+        const { page = 1, limit = 20, isActive } = req.query;
 
         const restaurantExists = await Restaurant.findById(restaurantId);
         if (!restaurantExists) {
@@ -233,12 +232,15 @@ export const getTablesByRestaurant = async (req, res) => {
         if (normalizedIsActive !== undefined) {
             filter.isActive = normalizedIsActive;
         }
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        const skip = (parsedPage - 1) * parsedLimit;
 
         const [tables, total] = await Promise.all([
             Table.find(filter)
                 .populate('restaurant', 'name')
-                .limit(parseInt(limit))
+                .limit(parsedLimit)
                 .skip(skip)
                 .sort({ tableNumber: 1 }), 
             Table.countDocuments(filter)
@@ -249,9 +251,9 @@ export const getTablesByRestaurant = async (req, res) => {
             data: tables,
             pagination: {
                 totalRecords: total,
-                totalPages: Math.ceil(total / limit),
-                currentPage: parseInt(page),
-                limit: parseInt(limit)
+                totalPages: Math.ceil(total / parsedLimit),
+                currentPage: parsedPage,
+                limit: parsedLimit
             }
         });
 

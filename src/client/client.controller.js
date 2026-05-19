@@ -44,7 +44,7 @@ export const createClient = async (req, res) => {
 export const getClients = async (req, res) => {
 
     try {
-        const { page = 1, limit = 10, isActive, search = '' } = req.query;
+        const { page = 1, limit = 20, isActive, search = '' } = req.query;
 
         const filter = {};
         if (isActive !== undefined) {
@@ -60,16 +60,13 @@ export const getClients = async (req, res) => {
             ];
         }
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
-        }
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
 
         const clients = await Client.find(filter)
-            .limit(options.limit)
-            .skip((options.page - 1) * options.limit)
-            .sort(options.sort);
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Client.countDocuments(filter);
 
@@ -77,10 +74,10 @@ export const getClients = async (req, res) => {
             success: true,
             data: clients,
             pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit
+                limit: parsedLimit
             }
         })
     } catch (error) {

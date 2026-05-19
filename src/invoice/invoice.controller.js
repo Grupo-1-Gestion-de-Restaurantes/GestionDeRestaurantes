@@ -7,6 +7,7 @@ export const getMyInvoices = async (req, res) => {
     try {
         const user = req.user;
         const userId = user.uid || user._id || user.id;
+        const { page = 1, limit = 10 } = req.query;
 
         // Si es ADMIN o MANAGER, puede ver todas las facturas del sistema.
         // Si es CLIENT, solo las suyas.
@@ -14,14 +15,27 @@ export const getMyInvoices = async (req, res) => {
             ? {}
             : { client: userId.toString() };
 
+        const parsedPage = parseInt(page, 10) || 1;
+        const parsedLimit = parseInt(limit, 10) || 10;
+
         const invoices = await Invoice.find(filter)
             .populate('restaurant', 'name photo address')
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
             .sort({ issuedAt: -1 });
+
+        const total = await Invoice.countDocuments(filter);
 
         res.status(200).json({
             success: true,
-            total: invoices.length,
-            invoices
+            total,
+            invoices,
+            pagination: {
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
+                totalRecords: total,
+                limit: parsedLimit
+            }
         });
     } catch (error) {
         res.status(500).json({
