@@ -51,6 +51,7 @@ export const getRestaurantes = async (req, res) => {
     const { page = 1, limit = 20, isActive, search = '',  city, rating, categories} = req.query;
 
     const filter = {};
+    const user = req.user;
 
     if (city) {
       filter.city = { $regex: city, $options: 'i' };
@@ -70,7 +71,6 @@ export const getRestaurantes = async (req, res) => {
     if (normalizedIsActive !== undefined) {
       filter.isActive = normalizedIsActive;
     } else if (isActive === undefined) {
-      // Por defecto mostrar solo activos si no se especifica nada
       filter.isActive = true;
     }
 
@@ -81,6 +81,18 @@ export const getRestaurantes = async (req, res) => {
         { categories: { $regex: normalizedSearch, $options: 'i' } },
         { status: { $regex: normalizedSearch, $options: 'i' } },
       ];
+    }
+
+    if (user.role === 'MANAGER_ROLE') {
+      const Employee = (await import('../employees/employee.model.js')).default;
+      const employee = await Employee.findOne({ userId: user.id });
+      if (!employee) {
+        return res.status(403).json({
+          success: false,
+          message: "No se encontró información de tu restaurante."
+        });
+      }
+      filter._id = employee.restaurant;
     }
 
     const parsedPage = parseInt(page, 10) || 1;
