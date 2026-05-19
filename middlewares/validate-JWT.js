@@ -53,6 +53,7 @@ export const validateJWT = (req, res, next) => {
             role: role, 
             email: decoded.email || 'Unknown', 
             name: decoded.name || 'Unknown', 
+            phone: decoded.phone || '',
         };
 
         next();

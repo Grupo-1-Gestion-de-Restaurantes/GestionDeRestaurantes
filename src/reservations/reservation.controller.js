@@ -1,6 +1,7 @@
 import Reservation from './reservation.model.js';
 import Restaurant from '../restaurants/restaurant.model.js';
 import Table from '../table/table.model.js';
+import Employee from '../employees/employee.model.js';
 import { notificationService } from '../notifications/notification.service.js';
 
 const parseActiveFilter = (value) => {
@@ -23,7 +24,26 @@ export const createReservation = async (req, res) => {
     try {
 
         const reservationData = req.body;
-        const { restaurant, table, reservationDate, durationInMinutes, numberOfPeople } = reservationData;
+        const { restaurantId, tableId, reservationDate, time, durationInMinutes, numberOfPeople, occasion } = reservationData;
+        const user = req.user;
+
+        const restaurant = restaurantId;
+        const table = tableId;
+
+        const reservationDateTime = time 
+            ? new Date(`${reservationDate}T${time}:00`)
+            : new Date(reservationDate);
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Solo puedes crear reservaciones para tu propio restaurante."
+                });
+            }
+        }
 
         const targetTable = await Table.findById(table);
         if (!targetTable) {
@@ -47,8 +67,8 @@ export const createReservation = async (req, res) => {
             });
         }
 
-        const newStart = new Date(reservationDate);
         const duration = durationInMinutes || 90; 
+        const newStart = reservationDateTime;
         const newEnd = new Date(newStart.getTime() + duration * 60000);
 
         const overlappingReservation = await Reservation.findOne({
@@ -77,14 +97,20 @@ export const createReservation = async (req, res) => {
             }
         });
 
-        if (overlappingReservation) {
+if (overlappingReservation) {
             return res.status(400).json({
                 success: false,
-                message: 'La mesa ya se encuentra reservada o en uso durante ese lapso de tiempo.'
+                message: 'La mesa ya se encuentra reservada o en uso durante ese lapse de tiempo.'
             });
         }
 
-        const reservation = new Reservation(reservationData);
+        const reservation = new Reservation({
+            ...reservationData,
+            restaurant,
+            table,
+            client: req.user._id,
+            reservationDate: reservationDateTime,
+        });
         await reservation.save();
 
         await notificationService.createAndEmit(
@@ -99,7 +125,7 @@ export const createReservation = async (req, res) => {
         res.status(201).json({
             success: true,
             message: 'Reserva creada exitosamente',
-            data: reservation
+            order: reservation
         });
 
     } catch (error) {
@@ -114,18 +140,29 @@ export const createReservation = async (req, res) => {
 export const getReservations = async (req, res) => {
     try {
         const { page = 1, limit = 20, isActive, restaurant } = req.query;
-
+        const user = req.user;
         const filter = {};
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
+        }
+
         const normalizedIsActive = parseActiveFilter(isActive);
 
         if (normalizedIsActive !== undefined) {
             filter.isActive = normalizedIsActive;
         } else if (isActive === undefined) {
             filter.isActive = true;
-        }
-
-        if (restaurant) {
-            filter.restaurant = restaurant;
         }
 
         const parsedPage = parseInt(page);
@@ -163,6 +200,7 @@ export const getReservations = async (req, res) => {
 export const getReservationById = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const reservation = await Reservation.findById(id);
         if (!reservation) {
@@ -170,6 +208,17 @@ export const getReservationById = async (req, res) => {
                 success: false,
                 message: 'Reservación no encontrada',
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== reservation.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver reservaciones de otros restaurantes."
+                });
+            }
         }
 
         res.status(200).json({
@@ -180,7 +229,7 @@ export const getReservationById = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener la reservación',
-            error: error.message,
+            error: error.message
         });
     }
 };
@@ -188,6 +237,7 @@ export const getReservationById = async (req, res) => {
 export const updateReservation = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const currentReservation = await Reservation.findById(id);
         if (!currentReservation) {
@@ -195,6 +245,17 @@ export const updateReservation = async (req, res) => {
                 success: false,
                 message: "Reservación no encontrada",
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== currentReservation.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para actualizar reservaciones de otros restaurantes."
+                });
+            }
         }
 
         const updateData = { ...req.body };
@@ -232,7 +293,7 @@ export const updateReservation = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error al actualizar reservación",
-            error: error.message,
+            error: error.message
         });
     }
 };
@@ -240,22 +301,35 @@ export const updateReservation = async (req, res) => {
 export const changeReservationStatus = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         // Detectar si es activate o deactivate desde la URL
         const isActive = req.url.includes('/activate');
         const action = isActive ? 'activado' : 'desactivado';
+
+        const reservationToUpdate = await Reservation.findById(id);
+        if (!reservationToUpdate) {
+            return res.status(404).json({
+                success: false,
+                message: 'Reservación no encontrada',
+            });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== reservationToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para gestionar el estado de reservaciones de otros restaurantes."
+                });
+            }
+        }
 
         const reservation = await Reservation.findByIdAndUpdate(
             id,
             { isActive },
             { new: true }
         );
-
-        if (!reservation) {
-            return res.status(404).json({
-                success: false,
-                message: 'Reservación no encontrada',
-            });
-        }
 
         res.status(200).json({
             success: true,
@@ -266,7 +340,7 @@ export const changeReservationStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al cambiar el estado del reservación',
-            error: error.message,
+            error: error.message
         });
     }
 };
@@ -302,7 +376,7 @@ export const getMyReservations = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener las reservaciones',
-            error: error.message,
+            error: error.message
         });
     }
 };

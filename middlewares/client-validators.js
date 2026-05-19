@@ -19,7 +19,7 @@ export const validateCreateClient = [
         .isEmail().withMessage('Debe ser un correo electrónico válido'),
     body('phone')
         .trim()
-        .matches(/^[0-9]{8,15}$/).withMessage('Ingrese un número de teléfono válido (8 a 15 dígitos)'),
+        .matches(/^[0-9]{0,15}$/).withMessage('Ingrese un número de teléfono válido (0 a 15 dígitos)'),
     body('birthdate')
         .notEmpty().withMessage('La fecha de nacimiento es obligatoria')
         .isISO8601().withMessage('Formato de fecha inválido (AAAA-MM-DD)'),
@@ -39,18 +39,18 @@ export const validateCreateClient = [
 
 export const validateUpdateClientRequest = [
     validateJWT,
-    requireRole('ADMIN_ROLE', 'CLIENT_ROLE', 'USER_ROLE'),
     syncClient,
+    requireRole('ADMIN_ROLE', 'CLIENT_ROLE', 'USER_ROLE'),
     body('name')
         .optional()
         .trim()
         .notEmpty()
         .withMessage('El nombre no puede estar vacío'),
     body('phone')
-        .optional()
+        .optional({ nullable: true, checkFalsy: true })
         .trim()
         .matches(/^[0-9]{7,15}$/)
-        .withMessage('Teléfono inválido'),
+        .withMessage('Teléfono inválido (7-15 dígitos)'),
     body('birthdate')
         .optional()
         .isISO8601()

@@ -75,3 +75,31 @@ export const sendAdminAlertEmail = async (subject, htmlContent) => {
 
     return transporter.sendMail(mailOptions);
 };
+
+export const sendEventSubscriptionEmail = async (clientEmail, clientName, eventName, eventDateTime, restaurantName, finalPrice) => {
+    const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        secure: false, 
+        auth: {
+            user: process.env.SMTP_USERNAME,
+            pass: process.env.SMTP_PASSWORD 
+        }
+    });
+
+    const eventDate = new Date(eventDateTime).toLocaleDateString('es-GT', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const subject = `¡Te has inscrito al evento: ${eventName}!`;
+    const text = `Hola ${clientName},\n\n¡Te has inscrito exitosamente al evento "${eventName}"!\n\n📅 Fecha y hora: ${eventDate}\n🏪 Restaurante: ${restaurantName}\n💰 Precio pagado: Q${finalPrice.toFixed(2)}\n\n¡Te esperamos!`;
+
+    const mailOptions = {
+        from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+        to: clientEmail,
+        subject: subject,
+        text: text
+    };
+
+    return transporter.sendMail(mailOptions);
+};

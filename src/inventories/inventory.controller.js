@@ -51,7 +51,22 @@ export const createInventoryItem = async (req, res) => {
 export const getInventory = async (req, res) => {
     try {
         const { page = 1, limit = 20, isActive, restaurant } = req.query;
+        const user = req.user;
         const filter = {};
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
+        }
 
         const normalizedIsActive = parseActiveFilter(isActive);
         if (normalizedIsActive !== undefined) {
@@ -59,8 +74,6 @@ export const getInventory = async (req, res) => {
         } else if (isActive === undefined) {
             filter.isActive = true;
         }
-
-        if (restaurant) filter.restaurant = restaurant;
 
         const parsedPage = parseInt(page);
         const parsedLimit = parseInt(limit);
@@ -94,6 +107,17 @@ export const getInventoryById = async (req, res) => {
     try {
         const item = await Inventory.findOne({ _id: req.params.id, isActive: true });
         if (!item) return res.status(404).json({ success: false, message: 'Item no encontrado' });
+
+        // Enforce MANAGER_ROLE restriction
+        if (req.user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: req.user.id });
+            if (!employee || employee.restaurant.toString() !== item.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver items de otros restaurantes."
+                });
+            }
+        }
 
         res.status(200).json({ success: true, data: item });
     } catch (error) {

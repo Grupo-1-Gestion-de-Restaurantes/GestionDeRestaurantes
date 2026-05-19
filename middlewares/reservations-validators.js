@@ -9,7 +9,7 @@ import Restaurant from '../src/restaurants/restaurant.model.js';
 export const validateCreateReservation = [
     validateJWT,
     syncClient, 
-    body('restaurant')
+    body('restaurantId')
         .notEmpty().withMessage('El ID del restaurante es obligatorio')
         .isMongoId().withMessage('ID de restaurante inválido')
         .custom(async (value) => {
@@ -19,15 +19,22 @@ export const validateCreateReservation = [
             }
             return true;
         }),
+    body('tableId')
+        .notEmpty().withMessage('El ID de la mesa es obligatorio')
+        .isMongoId().withMessage('ID de mesa inválido'),
     body('reservationDate')
         .notEmpty().withMessage('La fecha de reservación es obligatoria')
-        .isISO8601().withMessage('Formato de fecha inválido')
+        .isISO8601().withMessage('Formato de fecha inválido, usa YYYY-MM-DD')
         .custom((value) => {
             if (new Date(value) < new Date()) {
                 throw new Error('La fecha de reservación no puede ser en el pasado');
             }
             return true;
         }),
+    body('time')
+        .optional()
+        .matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
+        .withMessage('Formato de hora inválido (HH:MM)'),
     body('numberOfPeople')
         .notEmpty().withMessage('El número de personas es obligatorio')
         .isInt({ min: 1, max: 20 }).withMessage('El número de personas debe ser entre 1 y 20'),

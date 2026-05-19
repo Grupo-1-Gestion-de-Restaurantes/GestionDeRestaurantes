@@ -22,10 +22,15 @@ export const initializeSocket = (httpServer) => {
         }
 
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const verifyOptions = {};
+            if (process.env.JWT_ISSUER) verifyOptions.issuer = process.env.JWT_ISSUER;
+            if (process.env.JWT_AUDIENCE) verifyOptions.audience = process.env.JWT_AUDIENCE;
+
+            const decoded = jwt.verify(token, process.env.JWT_SECRET, verifyOptions);
             socket.userId = decoded.sub;
             next();
-        } catch {
+        } catch (error) {
+            console.error('Socket JWT validation error:', error.message);
             next(new Error('Token inválido'));
         }
     });

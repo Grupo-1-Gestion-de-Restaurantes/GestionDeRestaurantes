@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Order from "./order.model.js";
 import Dish from "../dishes/dish.model.js";
 import Restaurant from "../restaurants/restaurant.model.js";
+import Employee from "../employees/employee.model.js";
 import Invoice from "../invoice/invoice.model.js";
 import { generatePDFBuffer } from "../invoice/invoice.controller.js";
 import { sendInvoiceEmail } from "../../helpers/email-service.js";
@@ -361,6 +362,17 @@ export const updateOrderStatus = async (req, res) => {
             return res.status(404).json({ success: false, message: "Pedido no encontrado" });
         }
 
+        // Enforce MANAGER_ROLE restriction for updates
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== order.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para gestionar pedidos de este restaurante"
+                });
+            }
+        }
+
         const normalizedStatus = status.toUpperCase();
 
         if (normalizedStatus === 'CANCELADO') {
@@ -419,6 +431,18 @@ export const updateOrderStatus = async (req, res) => {
 export const createOrderAdmin = async (req, res) => {
     try {
         const { clientId, restaurantId, items, paymentMethod, deliveryAddress, deliveryType } = req.body;
+        const user = req.user;
+
+        // Enforce MANAGER_ROLE restriction for creation
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== restaurantId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Solo puedes crear pedidos para tu propio restaurante"
+                });
+            }
+        }
 
         console.log("BODY RECIBIDO:", req.body);
 
@@ -526,14 +550,32 @@ export const updateOrderAdmin = async (req, res) => {
     try {
         const { id } = req.params;
         const { clientId, restaurantId, items, paymentMethod, deliveryAddress, deliveryType } = req.body;
+        const user = req.user;
 
         const order = await Order.findById(id);
         if (!order) {
             return res.status(404).json({ success: false, message: "Pedido no encontrado" });
         }
 
-        const updateData = {};
+        // Enforce MANAGER_ROLE restriction for updates
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== order.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para actualizar pedidos de este restaurante"
+                });
+            }
+            if (restaurantId && restaurantId.toString() !== employee.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No puedes transferir un pedido a otro restaurante"
+                });
+            }
+        }
 
+        const updateData = {};
+        // ... rest of method
         if (clientId) updateData.client = clientId;
         if (restaurantId) updateData.restaurant = restaurantId;
         if (paymentMethod) updateData.paymentMethod = paymentMethod;
@@ -593,17 +635,28 @@ export const updateOrderAdmin = async (req, res) => {
 export const getOrders = async (req, res) => {
     try {
         const { page = 1, limit = 20, restaurante, isActive } = req.query;
+        const user = req.user;
         const filter = {};
+
+        // Enforce MANAGER_ROLE restriction for listing
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de empleado para este manager."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        } else if (restaurante) {
+            filter.restaurant = restaurante;
+        }
 
         const normalizedIsActive = parseActiveFilter(isActive);
         if (normalizedIsActive !== undefined) {
             filter.isActive = normalizedIsActive;
         } else if (isActive === undefined) {
             filter.isActive = true;
-        }
-
-        if (restaurante) {
-            filter.restaurant = restaurante;
         }
         
         const parsedPage = parseInt(page);
@@ -640,6 +693,24 @@ export const getOrders = async (req, res) => {
 export const deleteOrder = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
+
+        const order = await Order.findById(id);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Pedido no encontrado" });
+        }
+
+        // Enforce MANAGER_ROLE restriction for deletion
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== order.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para eliminar pedidos de este restaurante"
+                });
+            }
+        }
+
         const updatedOrder = await Order.findByIdAndUpdate(
             id,
             { isActive: false, status: 'CANCELADO' },

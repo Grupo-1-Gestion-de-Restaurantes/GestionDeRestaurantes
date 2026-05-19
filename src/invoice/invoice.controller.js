@@ -1,6 +1,7 @@
 import Invoice from './invoice.model.js';
 import Order from '../orders/order.model.js';
 import Restaurante from '../restaurants/restaurant.model.js';
+import Employee from '../employees/employee.model.js';
 import PDFDocument from "pdfkit-table";
 
 export const getMyInvoices = async (req, res) => {
@@ -9,11 +10,22 @@ export const getMyInvoices = async (req, res) => {
         const userId = user.uid || user._id || user.id;
         const { page = 1, limit = 10 } = req.query;
 
-        // Si es ADMIN o MANAGER, puede ver todas las facturas del sistema.
-        // Si es CLIENT, solo las suyas.
-        const filter = (user.role === 'ADMIN_ROLE' || user.role === 'MANAGER_ROLE')
-            ? {}
-            : { client: userId.toString() };
+        let filter = {};
+
+        if (user.role === 'ADMIN_ROLE') {
+            filter = {};
+        } else if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter = { restaurant: employee.restaurant };
+        } else {
+            filter = { client: userId.toString() };
+        }
 
         const parsedPage = parseInt(page, 10) || 1;
         const parsedLimit = parseInt(limit, 10) || 10;
@@ -49,8 +61,8 @@ export const getMyInvoices = async (req, res) => {
 export const getInvoiceById = async (req, res) => {
     try {
         const { id } = req.params;
-        const client = req.user;
-        const clientId = client.uid || client._id;
+        const user = req.user;
+        const userId = user.uid || user._id || user.id;
 
         const invoice = await Invoice.findById(id)
             .populate('restaurant', 'name photo address phone')
@@ -63,11 +75,22 @@ export const getInvoiceById = async (req, res) => {
             });
         }
 
-        if (invoice.client.toString() !== clientId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: "No tienes permiso para ver esta factura"
-            });
+        // Check permissions
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== invoice.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver facturas de otros restaurantes."
+                });
+            }
+        } else if (user.role !== 'ADMIN_ROLE') {
+            if (invoice.client.toString() !== userId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver esta factura"
+                });
+            }
         }
 
         res.status(200).json({
@@ -86,8 +109,8 @@ export const getInvoiceById = async (req, res) => {
 export const getInvoicePdfById = async (req, res) => {
     try {
         const { id } = req.params;
-        const client = req.user;
-        const clientId = client.uid || client._id;
+        const user = req.user;
+        const userId = user.uid || user._id || user.id;
 
         const invoice = await Invoice.findById(id)
             .populate('restaurant', 'name photo address phone')
@@ -100,11 +123,22 @@ export const getInvoicePdfById = async (req, res) => {
             });
         }
 
-        if (invoice.client.toString() !== clientId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: "No tienes permiso para ver esta factura"
-            });
+        // Check permissions
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== invoice.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver facturas de otros restaurantes."
+                });
+            }
+        } else if (user.role !== 'ADMIN_ROLE') {
+            if (invoice.client.toString() !== userId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver esta factura"
+                });
+            }
         }
 
         const pdfBuffer = await generatePDFBuffer(invoice);

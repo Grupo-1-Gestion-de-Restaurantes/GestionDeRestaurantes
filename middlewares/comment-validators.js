@@ -1,4 +1,4 @@
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import { checkValidators } from './checkValidators.js';
 import { validateJWT } from './validate-JWT.js';
 import { requireRole } from './validate-role.js';
@@ -99,6 +99,32 @@ export const validateGetCommentsDish = [
 export const validateGetCommentsRestaurant = [
     param('restaurantId')
         .isMongoId()
+        .withMessage('restaurantId debe ser un ObjectId válido de MongoDB'),
+    checkValidators,
+];
+
+export const validateGetComments = [
+    validateJWT,
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE', 'EMPLOYEE_ROLE'),
+    query('page')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('La página debe ser mayor a 0'),
+    query('limit')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('El límite debe ser mayor a 0'),
+    query('search')
+        .optional()
+        .isString()
+        .withMessage('La búsqueda debe ser texto'),
+    query('restaurantId')
+        .optional()
+        .isMongoId()
         .withMessage('restaurantId debe ser un ObjectId válido'),
+    query('isActive')
+        .optional()
+        .isIn(['true', 'false'])
+        .withMessage('isActive debe ser true o false'),
     checkValidators,
 ];

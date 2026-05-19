@@ -1,6 +1,7 @@
 import Order from '../orders/order.model.js';
 import Reservation from '../reservations/reservation.model.js';
 import Restaurant from '../restaurants/restaurant.model.js';
+import Employee from '../employees/employee.model.js';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit-table';
 import axios from 'axios';
@@ -45,9 +46,40 @@ const styleDataCell = (cell, align = 'center', isAlt = false) => {
 
 export const getGeneralReport = async (req, res) => {
     try {
-        const { format, restaurantId } = req.query;
+        let { format, restaurantId } = req.query;
+        const user = req.user;
+
+        console.log(`[REPORT] User ${user.id} with role ${user.role} requesting report. Query restaurantId: ${restaurantId}`);
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                console.error(`[REPORT] No employee record found for user ID: ${user.id}`);
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de empleado para este manager."
+                });
+            }
+            
+            const managerRestaurantId = employee.restaurant.toString();
+            console.log(`[REPORT] Manager assigned to restaurant: ${managerRestaurantId}`);
+            
+            // If they provided a restaurantId, it MUST be theirs
+            if (restaurantId && restaurantId !== managerRestaurantId) {
+                console.warn(`[REPORT] Forbidden: Manager ${user.id} tried to access restaurant ${restaurantId}`);
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver reportes de otros restaurantes."
+                });
+            }
+            
+            // Force their restaurantId
+            restaurantId = managerRestaurantId;
+        }
 
         const isIndividual = !!restaurantId;
+        console.log(`[REPORT] Final filter restaurantId: ${restaurantId}`);
         const filter = isIndividual
             ? { restaurant: new mongoose.Types.ObjectId(restaurantId) }
             : {};
