@@ -49,6 +49,6 @@ const reservationSchema = new mongoose.Schema({
 });
 
 
-reservationSchema.index({ table: 1, reservationDate: 1 }, { unique: true });
+reservationSchema.index({ table: 1, reservationDate: 1 });
 
 export default mongoose.model('Reservation', reservationSchema);
