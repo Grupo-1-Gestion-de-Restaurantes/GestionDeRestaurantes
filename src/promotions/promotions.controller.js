@@ -57,7 +57,6 @@ export const getPromotion = async (req, res) => {
         const user = req.user;
         const filter = {};
 
-        // Enforce MANAGER_ROLE restriction
         if (user.role === 'MANAGER_ROLE') {
             const employee = await Employee.findOne({ userId: user.id });
             if (!employee) {
@@ -69,6 +68,11 @@ export const getPromotion = async (req, res) => {
             filter.restaurant = employee.restaurant;
         } else if (restaurant && mongoose.Types.ObjectId.isValid(restaurant)) {
             filter.restaurant = restaurant;
+        } else {
+            filter.isActive = true;
+            filter.status = 'APPROVED';
+            filter.startDate = { $lte: new Date() };
+            filter.endDate = { $gte: new Date() };
         }
 
         const normalizedIsActive = parseActiveFilter(isActive);
