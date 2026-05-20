@@ -4,6 +4,7 @@ import { body, param } from 'express-validator';
 import { checkValidators } from './checkValidators.js';
 import Employee from '../src/employees/employee.model.js';
 import Restaurant from '../src/restaurants/restaurant.model.js';
+import Client from '../src/client/client.model.js';
 
 export const validateCreateEmployee = [
     validateJWT,
@@ -31,7 +32,13 @@ export const validateCreateEmployee = [
         .notEmpty()
         .withMessage('El email es requerido')
         .isEmail()
-        .withMessage('El email debe tener un formato válido'),
+        .withMessage('El email debe tener un formato válido')
+        .custom(async (email) => {
+            const clientExists = await Client.findOne({ email });
+            if (clientExists) {
+                throw new Error('El correo electrónico ya está registrado como cliente');
+            }
+        }),
     body('password')
         .notEmpty()
         .withMessage('La contraseña es requerida')

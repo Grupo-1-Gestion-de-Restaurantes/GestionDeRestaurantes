@@ -1,6 +1,7 @@
 import Restaurante from "../restaurants/restaurant.model.js";
 import Reservation from "../reservations/reservation.model.js";
 import Order from "../orders/order.model.js";
+import Employee from "../employees/employee.model.js";
 import mongoose from "mongoose";
 
 const parseActiveFilter = (value) => {
@@ -127,6 +128,17 @@ export const getRestaurantes = async (req, res) => {
 export const getRestauranteById = async (req, res) => {
   try {
     const { id } = req.params;
+    const user = req.user;
+
+    if (user.role === 'MANAGER_ROLE') {
+      const employee = await Employee.findOne({ userId: user.id });
+      if (!employee || employee.restaurant.toString() !== id) {
+        return res.status(403).json({
+          success: false,
+          message: "No tienes permiso para ver otros restaurantes."
+        });
+      }
+    }
 
     const restaurante = await Restaurante.findById(id);
 
@@ -149,6 +161,7 @@ export const getRestauranteById = async (req, res) => {
     });
   }
 };
+
 
 export const updateRestaurante = async (req, res) => {
   try {
