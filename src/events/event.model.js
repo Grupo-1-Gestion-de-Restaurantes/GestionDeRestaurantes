@@ -39,7 +39,7 @@ const eventSchema = new mongoose.Schema({
     ],
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Restaurant',
+        ref: 'Restaurante',
         required: [true, 'El restaurante del evento es obligatorio']
     },
     assignedTables: [{

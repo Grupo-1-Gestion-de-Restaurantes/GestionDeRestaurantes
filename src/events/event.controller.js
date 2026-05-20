@@ -1,13 +1,43 @@
 import Event from './event.model.js';
 import Promotion from '../promotions/promotions.model.js';
+import Employee from '../employees/employee.model.js';
+import Client from '../client/client.model.js';
+import { sendEventSubscriptionEmail } from '../../helpers/email-service.js';
+
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
 
 export const createEvent = async (req, res) => {
     try {
-        const { activePromotions } = req.body;
+        const { activePromotions, restaurant } = req.body;
+        const user = req.user;
         let validPromotions = [];
 
-        if (activePromotions && activePromotions.length > 0) {
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Solo puedes crear eventos para tu propio restaurante."
+                });
+            }
+        }
 
+        if (activePromotions && activePromotions.length > 0) {
             for (const promoId of activePromotions) {
                 const activePromo = await Promotion.findOne({
                     _id: promoId,
@@ -32,7 +62,6 @@ export const createEvent = async (req, res) => {
         delete req.body.activePromotions;
 
         const event = new Event(req.body);
-
         event.activePromotions = validPromotions;
 
         await event.save();
@@ -50,22 +79,45 @@ export const createEvent = async (req, res) => {
         });
     }
 };
+
 export const getEvents = async (req, res) => {
     try {
+        const { page = 1, limit = 20, isActive, restaurant } = req.query;
+        const user = req.user;
+        const filter = {};
 
-        const { page = 1, limit = 10, isActive = true } = req.query;
-        const filter = { isActive };
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
+        }
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
-        };
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
+        }
+
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
 
         const events = await Event.find(filter)
-            .limit(options.limit)
-            .skip((options.page - 1) * options.limit)
-            .sort(options.sort);
+            .populate('restaurant', 'name address')
+            .populate('assignedEmployees', 'fullName specialty')
+            .populate('specialDishes', 'name price')
+            .populate('assignedTables', 'tableNumber capacity')
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Event.countDocuments(filter);
 
@@ -73,10 +125,10 @@ export const getEvents = async (req, res) => {
             success: true,
             data: events,
             pagination: {
-                currentPage: options.page,
-                totalPages: Math.ceil(total / options.limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit: options.limit
+                limit: parsedLimit
             }
         });
 
@@ -91,16 +143,30 @@ export const getEvents = async (req, res) => {
 
 export const getEventById = async (req, res) => {
     try {
-
         const eventId = req.params.id;
-        const event = await Event.findById(eventId);
-
+        const user = req.user;
+        const event = await Event.findById(eventId)
+            .populate('restaurant', 'name address')
+            .populate('assignedEmployees', 'fullName specialty')
+            .populate('specialDishes', 'name price')
+            .populate('assignedTables', 'tableNumber capacity');
 
         if (!event) {
             return res.status(404).json({
                 success: false,
                 message: 'Evento no encontrado'
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== event.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver eventos de otros restaurantes."
+                });
+            }
         }
 
         res.status(200).json({
@@ -119,20 +185,37 @@ export const getEventById = async (req, res) => {
 };
 
 export const updateEvent = async (req, res) => {
-
     try {
-
         const eventId = req.params.id;
         const updateData = req.body;
+        const user = req.user;
 
-        const updatedEvent = await Event.findByIdAndUpdate(eventId, updateData, { new: true, runValidators: true });
-
-        if (!updatedEvent) {
+        const eventToUpdate = await Event.findById(eventId);
+        if (!eventToUpdate) {
             return res.status(404).json({
                 success: false,
                 message: 'Evento no encontrado'
             });
         }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== eventToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para actualizar eventos de otros restaurantes."
+                });
+            }
+            if (updateData.restaurant && updateData.restaurant.toString() !== manager.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No puedes transferir un evento a otro restaurante."
+                });
+            }
+        }
+
+        const updatedEvent = await Event.findByIdAndUpdate(eventId, updateData, { new: true, runValidators: true });
 
         res.status(200).json({
             success: true,
@@ -153,15 +236,28 @@ export const changeEventStatus = async (req, res) => {
     try {
         const eventId = req.params.id;
         const { isActive } = req.body;
+        const user = req.user;
 
-        const updatedEvent = await Event.findByIdAndUpdate(eventId, { isActive }, { new: true });
-
-        if (!updatedEvent) {
+        const eventToUpdate = await Event.findById(eventId);
+        if (!eventToUpdate) {
             return res.status(404).json({
                 success: false,
                 message: 'Evento no encontrado'
             });
         }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== eventToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para cambiar el estado de eventos de otros restaurantes."
+                });
+            }
+        }
+
+        const updatedEvent = await Event.findByIdAndUpdate(eventId, { isActive }, { new: true });
 
         res.status(200).json({
             success: true,
@@ -186,8 +282,15 @@ export const subscribeToEvent = async (req, res) => {
 
         const clientId = req.user.id;
 
-        const eventInfo = await Event.findById(id);
+        const eventInfo = await Event.findById(id).populate('restaurant', 'name');
         if (!eventInfo) throw new Error('Evento no encontrado');
+
+        if (eventInfo.attendees.includes(clientId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Ya estás inscrito en este evento'
+            });
+        }
 
         let finalPrice = eventInfo.price || 0;
         let discountValue = 0;
@@ -226,6 +329,18 @@ export const subscribeToEvent = async (req, res) => {
         );
 
         if (!updatedEvent) throw new Error('Evento lleno o inactivo');
+
+        const clientInfo = await Client.findById(clientId);
+        if (clientInfo?.email) {
+            sendEventSubscriptionEmail(
+                clientInfo.email,
+                clientInfo.name || req.user.name || 'Cliente',
+                eventInfo.name,
+                eventInfo.dateTime,
+                eventInfo.restaurant?.name || 'Restaurante',
+                finalPrice
+            ).catch(err => console.error('Error sending subscription email:', err));
+        }
 
         res.status(200).json({
             success: true,

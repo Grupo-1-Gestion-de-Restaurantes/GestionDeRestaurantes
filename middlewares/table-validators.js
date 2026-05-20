@@ -86,7 +86,7 @@ export const validateTableAvailabilityChange = [
 
 export const validateGetTablesByRestaurant = [
     validateJWT,
-    requireRole('ADMIN_ROLE', 'MANAGER_ROLE', 'EMPLOYEE_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE', 'EMPLOYEE_ROLE', 'CLIENT_ROLE', 'USER_ROLE'),
     param('restaurantId')
         .isMongoId()
         .withMessage('El ID del restaurante no es válido')
@@ -102,6 +102,6 @@ export const validateGetTablesByRestaurant = [
 
 export const validateGetTables = [
     validateJWT,
-    requireRole('ADMIN_ROLE',),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     checkValidators 
 ];

@@ -1,10 +1,11 @@
 import Dish from './dish.model.js';
 import Restaurant from '../restaurants/restaurant.model.js';
+import Employee from '../employees/employee.model.js';
 
 export const createDish = async (req, res) => {
     try {
-
         const dishData = req.body;
+        const user = req.user;
 
         if (dishData.ingredients && typeof dishData.ingredients === 'string') {
             dishData.ingredients = JSON.parse(dishData.ingredients);
@@ -17,6 +18,17 @@ export const createDish = async (req, res) => {
             });
         }
 
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== dishData.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Solo puedes crear platillos para tu propio restaurante."
+                });
+            }
+        }
+
         const restaurantExists = await Restaurant.findById(dishData.restaurant);
         if (!restaurantExists) {
             return res.status(404).json({
@@ -27,7 +39,6 @@ export const createDish = async (req, res) => {
         if (req.file) {
             dishData.photo = req.file.path;
         }
-
 
         const dish = new Dish(dishData);
         await dish.save();
@@ -45,14 +56,49 @@ export const createDish = async (req, res) => {
     }
 }
 
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
+
 export const getDishes = async (req, res) => {
     try {
 
-        const { page = 1, limit = 10, isActive, search = '', dishType = '' } = req.query;
-
+        const { page = 1, limit = 20, isActive, restaurant, search = '', dishType = '' } = req.query;
+        const user = req.user;
         const filter = {};
-        if (isActive !== undefined) {
-            filter.isActive = isActive === 'true';
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
+        }
+
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            // Por defecto, si no se envía nada, mostrar solo activos
+            filter.isActive = true;
         }
 
         if (search) {
@@ -66,17 +112,14 @@ export const getDishes = async (req, res) => {
             filter.dishType = dishType;
         }
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
-        };
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
 
         const dishes = await Dish.find(filter)
             .populate({ path: 'restaurant', model: 'Restaurante', select: 'name' })
-            .limit(options.limit)
-            .skip((options.page - 1) * options.limit)
-            .sort(options.sort);
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Dish.countDocuments(filter);
 
@@ -84,10 +127,10 @@ export const getDishes = async (req, res) => {
             success: true,
             data: dishes,
             pagination: {
-                currentPage: options.page,
-                totalPages: Math.ceil(total / options.limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit: options.limit
+                limit: parsedLimit
             }
         });
 
@@ -102,8 +145,8 @@ export const getDishes = async (req, res) => {
 
 export const getDishById = async (req, res) => {
     try {
-
         const dishId = req.params.id;
+        const user = req.user;
         const dish = await Dish.findById(dishId);
 
         if (!dish) {
@@ -111,6 +154,17 @@ export const getDishById = async (req, res) => {
                 success: false,
                 message: 'Platillo no encontrado'
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== dish.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver platillos de otros restaurantes."
+                });
+            }
         }
 
         res.status(200).json({
@@ -129,11 +183,35 @@ export const getDishById = async (req, res) => {
 }
 
 export const updateDish = async (req, res) => {
-
     try {
-
         const dishId = req.params.id;
         const updateData = req.body;
+        const user = req.user;
+
+        const dishToUpdate = await Dish.findById(dishId);
+        if (!dishToUpdate) {
+            return res.status(404).json({
+                success: false,
+                message: 'Platillo no encontrado'
+            });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== dishToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para actualizar platillos de otros restaurantes."
+                });
+            }
+            if (updateData.restaurant && updateData.restaurant.toString() !== manager.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No puedes transferir un platillo a otro restaurante."
+                });
+            }
+        }
 
         if (updateData.ingredients && typeof updateData.ingredients === 'string') {
             updateData.ingredients = JSON.parse(updateData.ingredients);
@@ -144,13 +222,6 @@ export const updateDish = async (req, res) => {
         }
 
         const updatedDish = await Dish.findByIdAndUpdate(dishId, updateData, { new: true, runValidators: true });
-
-        if (!updatedDish) {
-            return res.status(404).json({
-                success: false,
-                message: 'Platillo no encontrado'
-            });
-        }
 
         res.status(200).json({
             success: true,
@@ -171,15 +242,28 @@ export const changeDishStatus = async (req, res) => {
     try {
         const dishId = req.params.id;
         const { isActive } = req.body;
+        const user = req.user;
 
-        const updatedDish = await Dish.findByIdAndUpdate(dishId, { isActive }, { new: true });
-
-        if (!updatedDish) {
+        const dishToUpdate = await Dish.findById(dishId);
+        if (!dishToUpdate) {
             return res.status(404).json({
                 success: false,
                 message: 'Platillo no encontrado'
             });
         }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== dishToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para cambiar el estado de platillos de otros restaurantes."
+                });
+            }
+        }
+
+        const updatedDish = await Dish.findByIdAndUpdate(dishId, { isActive }, { new: true });
 
         res.status(200).json({
             success: true,

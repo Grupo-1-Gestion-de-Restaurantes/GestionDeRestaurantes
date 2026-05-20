@@ -38,7 +38,7 @@ router.patch('/status/:id',
 router.put('/:id/activate', 
     validateChangePromotionStatus,
     changePromotionStatus);
-router.put('/:id/desactivate', validateChangePromotionStatus, changePromotionStatus);
+router.put('/:id/deactivate', validateChangePromotionStatus, changePromotionStatus);
 
 
 export default router;

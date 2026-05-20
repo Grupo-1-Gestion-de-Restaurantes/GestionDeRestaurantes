@@ -1,4 +1,7 @@
+import mongoose from "mongoose";
 import Promotions from "./promotions.model.js";
+import Dish from "../dishes/dish.model.js";
+import Employee from "../employees/employee.model.js";
 
 const parseActiveFilter = (value) => {
     if (value === undefined || value === null || value === '' || value === 'all') {
@@ -19,6 +22,19 @@ const parseActiveFilter = (value) => {
 export const createPromotion = async (req, res) => {
     try {
         const promotionData = req.body;
+        const user = req.user;
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== promotionData.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Solo puedes crear promociones para tu propio restaurante."
+                });
+            }
+        }
+
         const promotions = new Promotions(promotionData);
         await promotions.save();
         res.status(201).json({
@@ -37,34 +53,71 @@ export const createPromotion = async (req, res) => {
 
 export const getPromotion = async (req, res) => {
     try {
-        const { page = 1, limit = 10, isActive } = req.query;
+        const { page = 1, limit = 20, isActive, restaurant, scope, dishId, dishType } = req.query;
+        const user = req.user;
         const filter = {};
+
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        } else if (restaurant && mongoose.Types.ObjectId.isValid(restaurant)) {
+            filter.restaurant = restaurant;
+        } else {
+            filter.isActive = true;
+            filter.status = 'APPROVED';
+            filter.startDate = { $lte: new Date() };
+            filter.endDate = { $gte: new Date() };
+        }
+
         const normalizedIsActive = parseActiveFilter(isActive);
 
         if (normalizedIsActive !== undefined) {
             filter.isActive = normalizedIsActive;
         }
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
+        if (scope) {
+            filter.scope = scope;
         }
+
+        if (dishId && mongoose.Types.ObjectId.isValid(dishId)) {
+            filter.$or = [
+                { dishesApplicables: { $size: 0 } },
+                { dishesApplicables: dishId }
+            ];
+        } else if (dishType) {
+            const applicableDishes = await Dish.find({ dishType }).select('_id');
+            const dishIds = applicableDishes.map(d => d._id);
+            filter.$or = [
+                { dishesApplicables: { $size: 0 } },
+                { dishesApplicables: { $in: dishIds } }
+            ];
+        }
+
+        const parsedPage = Math.max(1, parseInt(page) || 1);
+        const parsedLimit = Math.max(1, parseInt(limit) || 20);
+
         const promotions = await Promotions.find(filter)
-            //.populate('promotions', 'name')
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
-            .sort(options.sort);
+            .populate('restaurant', 'name')
+            .populate('dishesApplicables', 'name')
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Promotions.countDocuments(filter);
         res.status(200).json({
             success: true,
             data: promotions,
             pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit
+                limit: parsedLimit
             }
         });
     } catch (error) {
@@ -73,13 +126,13 @@ export const getPromotion = async (req, res) => {
             message: 'Error al obtener las promociones',
             error: error.message
         });
-
     }
 };
 
 export const getPromotionById = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const promotion = await Promotions.findById(id);
 
@@ -88,6 +141,17 @@ export const getPromotionById = async (req, res) => {
                 success: false,
                 message: 'Promoción no encontrada'
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== promotion.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver promociones de otros restaurantes."
+                });
+            }
         }
 
         res.status(200).json({
@@ -106,6 +170,7 @@ export const getPromotionById = async (req, res) => {
 export const updatePromotion = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const currentPromotion = await Promotions.findById(id);
         if (!currentPromotion) {
@@ -114,6 +179,24 @@ export const updatePromotion = async (req, res) => {
                 message: 'Promoción no encontrada'
             });
         }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== currentPromotion.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para actualizar promociones de otros restaurantes."
+                });
+            }
+            if (req.body.restaurant && req.body.restaurant.toString() !== manager.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No puedes transferir una promoción a otro restaurante."
+                });
+            }
+        }
+
         const updateData = { ...req.body };
 
         const updatedPromotion = await Promotions.findByIdAndUpdate(id, updateData, {
@@ -138,32 +221,45 @@ export const updatePromotion = async (req, res) => {
 export const changePromotionStatus = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         const isActive = req.url.includes('/activate');
         const action = isActive ? 'activada' : 'desactivada';
 
-        const table = await Promotions.findByIdAndUpdate(
-            id,
-            { isActive },
-            { new: true }
-        );
-
-        if (!table) {
+        const promotionToUpdate = await Promotions.findById(id);
+        if (!promotionToUpdate) {
             return res.status(404).json({
                 success: false,
                 message: 'Promoción no encontrada',
             });
         }
 
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== promotionToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para gestionar el estado de promociones de otros restaurantes."
+                });
+            }
+        }
+
+        const updatedPromo = await Promotions.findByIdAndUpdate(
+            id,
+            { isActive },
+            { new: true }
+        );
+
         res.status(200).json({
             success: true,
             message: `Promoción ${action} exitosamente`,
-            data: table,
+            data: updatedPromo,
         });
     } catch (error) {
         res.status(500).json({
             success: false,
             message: 'Error al cambiar el estado de la promoción',
-            error: error.message,
+            error: error.message
         });
     }
 };
@@ -172,6 +268,7 @@ export const updatePromotionStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body; 
+        const user = req.user;
 
         const validStatuses = ['APPROVED', 'REJECTED'];
         if (!validStatuses.includes(status)) {
@@ -181,15 +278,27 @@ export const updatePromotionStatus = async (req, res) => {
             });
         }
 
+        const promotionToUpdate = await Promotions.findById(id);
+        if (!promotionToUpdate) {
+            return res.status(404).json({ success: false, message: 'Promoción no encontrada' });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== promotionToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para aprobar/rechazar promociones de otros restaurantes."
+                });
+            }
+        }
+
         const promo = await Promotions.findByIdAndUpdate(
             id,
             { status },
             { new: true, runValidators: true }
         );
-
-        if (!promo) {
-            return res.status(404).json({ success: false, message: 'Promoción no encontrada' });
-        }
 
         res.status(200).json({
             success: true,

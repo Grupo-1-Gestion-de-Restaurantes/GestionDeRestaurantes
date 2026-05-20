@@ -1,6 +1,8 @@
+import mongoose from 'mongoose';
 import Order from "./order.model.js";
 import Dish from "../dishes/dish.model.js";
 import Restaurant from "../restaurants/restaurant.model.js";
+import Employee from "../employees/employee.model.js";
 import Invoice from "../invoice/invoice.model.js";
 import { generatePDFBuffer } from "../invoice/invoice.controller.js";
 import { sendInvoiceEmail } from "../../helpers/email-service.js";
@@ -8,6 +10,22 @@ import InventoryItem from "../inventories/inventory.model.js";
 import Promotion from "../promotions/promotions.model.js";
 import { notificationService } from '../notifications/notification.service.js';
 import Client from "../client/client.model.js";
+
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
 
 const ORDER_NOTIFICATION_MAP = {
     CONFIRMADO: {
@@ -37,44 +55,65 @@ const ORDER_NOTIFICATION_MAP = {
     },
 };
 
+/**
+ * Crea una orden única compatible con selección de ID o envío de objeto manual.
+ */
 export const createOrder = async (req, res) => {
     try {
-        const { restaurantId, items, addressId, paymentMethod, promotion } = req.body;
+        const { 
+            restaurantId, 
+            items, 
+            addressId, 
+            deliveryAddress, 
+            deliveryType = 'DOMICILIO', 
+            paymentMethod, 
+            promotion 
+        } = req.body;
+
         const client = req.user;
         const stockDeductions = [];
+
+        if (!client) {
+            return res.status(404).json({ success: false, message: "Cliente no encontrado" });
+        }
 
         const restaurant = await Restaurant.findById(restaurantId);
         if (!restaurant) {
             return res.status(404).json({ success: false, message: "Restaurante no encontrado" });
         }
 
-        const selectedAddress = addressId
-            ? client.addresses.id(addressId)
-            : client.addresses.find(addr => addr.isDefault);
-
-        if (!selectedAddress) {
-            return res.status(400).json({
-                success: false,
-                message: "No se encontró una dirección válida en el perfil"
-            });
-        }
-
+        // --- Lógica de Promoción ---
         let activePromo = null;
         if (promotion) {
-            activePromo = await Promotion.findOne({
-                _id: promotion,
-                restaurant: restaurantId,
-                isActive: true,
-                status: 'APPROVED',
-                scope: { $in: ['PEDIDOS', 'GENERAL'] },
-                startDate: { $lte: new Date() },
-                endDate: { $gte: new Date() }
-            });
+            const basicFilter = mongoose.Types.ObjectId.isValid(promotion) 
+                ? { _id: promotion } 
+                : { title: promotion };
+            
+            const promo = await Promotion.findOne(basicFilter);
 
-            if (!activePromo) throw new Error("La promoción no es válida o ha expirado");
+            if (!promo) throw new Error("La promoción no es válida o no existe");
+            if (promo.restaurant.toString() !== restaurantId.toString()) throw new Error("Esta promoción no aplica a este restaurante");
+            if (promo.scope === 'EVENTOS') throw new Error("Esta promoción es exclusiva para eventos y no aplica a pedidos");
+            if (!promo.isActive || promo.status !== 'APPROVED') throw new Error("La promoción no se encuentra activa");
+            
+            const now = new Date();
+            if (now < promo.startDate || now > promo.endDate) throw new Error("La promoción ha expirado o aún no ha comenzado");
+            
+            activePromo = promo;
+
+            if (activePromo.isOneTimeUse) {
+                const alreadyUsed = await Order.findOne({ 
+                    client: client._id, 
+                    promotion: activePromo._id,
+                    status: { $ne: 'CANCELADO' }
+                });
+                if (alreadyUsed) throw new Error("Ya has utilizado esta promoción anteriormente");
+            }
         }
 
+        // --- Hidratación de Items y Validación de Stock ---
         let totalOrder = 0;
+        let promoAppliedCount = 0;
 
         const hydratedItems = await Promise.all(items.map(async (item) => {
             const dish = await Dish.findOne({
@@ -84,29 +123,38 @@ export const createOrder = async (req, res) => {
             }).populate('ingredients.inventoryItem');
 
             if (!dish) {
-                throw new Error(`El plato ${item.dishId} no está disponible o no pertenece a este restaurante`);
+                throw new Error(`El plato ${item.dishId} no está disponible en este restaurante`);
             }
             let subtotal = dish.price * item.quantity;
 
-            // Validación de inventario
             for (const ingredient of dish.ingredients) {
                 const totalNeeded = ingredient.quantityUsed * item.quantity;
-                const currentStock = ingredient.inventoryItem.quantity;
-
-                if (currentStock < totalNeeded) {
-                    throw new Error(`No hay suficiente stock de ${ingredient.inventoryItem.name} para preparar ${item.quantity} unidades de ${dish.name}`);
+                
+                // --- Null Safety Check ---
+                if (!ingredient.inventoryItem) {
+                    throw new Error(`El ingrediente para el plato "${dish.name}" ya no existe en el inventario.`);
                 }
 
-                // Guardar en memoria lo que se va a descontar
+                const currentStock = ingredient.inventoryItem.quantity || 0;
+
+                if (currentStock < totalNeeded) {
+                    throw new Error(`No hay suficiente stock de "${ingredient.inventoryItem.name}" para preparar ${item.quantity} unidades de ${dish.name}`);
+                }
+
                 stockDeductions.push({
                     inventoryItemId: ingredient.inventoryItem._id,
                     amountToDeduct: totalNeeded
                 });
             }
 
-            if (activePromo && activePromo.dishesApplicables.includes(dish._id)) {
-                const discount = subtotal * (activePromo.discountPercentage / 100);
-                subtotal -= discount;
+            if (activePromo) {
+                const isApplicable = activePromo.dishesApplicables.length === 0 || 
+                                    activePromo.dishesApplicables.some(id => id.toString() === dish._id.toString());
+                
+                if (isApplicable) {
+                    subtotal -= subtotal * (activePromo.discountPercentage / 100);
+                    promoAppliedCount++;
+                }
             }
 
             totalOrder += subtotal;
@@ -120,41 +168,75 @@ export const createOrder = async (req, res) => {
             };
         }));
 
-        // Descontar del inventario
+        if (activePromo && promoAppliedCount === 0 && activePromo.dishesApplicables.length > 0) {
+            throw new Error("La promoción no es aplicable a ninguno de los platos seleccionados");
+        }
+
+        // --- Descontar Stock ---
         if (stockDeductions.length > 0) {
-            const bulkOps = stockDeductions.map(deduction => ({
+            const bulkOps = stockDeductions.map(d => ({
                 updateOne: {
-                    filter: { _id: deduction.inventoryItemId },
-                    update: { $inc: { quantity: -deduction.amountToDeduct } }
+                    filter: { _id: d.inventoryItemId },
+                    update: { $inc: { quantity: -d.amountToDeduct } }
                 }
             }));
-
             await InventoryItem.bulkWrite(bulkOps);
         }
 
+        // --- Lógica de Dirección ---
+        const finalDeliveryType = deliveryType === 'RECOGER' ? 'RECOGER' : 'DOMICILIO';
+        let finalAddress = { alias: "N/A", addressLine: "Recoger en tienda" };
+
+        if (finalDeliveryType === 'DOMICILIO') {
+            if (deliveryAddress && typeof deliveryAddress === 'object') {
+                finalAddress = {
+                    alias: deliveryAddress.alias || "Otro",
+                    addressLine: deliveryAddress.addressLine || "",
+                    houseNumber: deliveryAddress.houseNumber || "",
+                    securityInfo: deliveryAddress.securityInfo || "",
+                    reference: deliveryAddress.reference || ""
+                };
+            } else {
+                const targetAddress = addressId 
+                    ? client.addresses.id(addressId)
+                    : client.addresses.find(a => a.isDefault) || client.addresses[0];
+                
+                if (!targetAddress) {
+                    return res.status(400).json({ success: false, message: "No se encontró una dirección de entrega válida" });
+                }
+
+                finalAddress = {
+                    alias: targetAddress.alias,
+                    addressLine: targetAddress.addressLine,
+                    houseNumber: targetAddress.houseNumber,
+                    securityInfo: targetAddress.securityInfo,
+                    reference: targetAddress.reference
+                };
+            }
+        }
+
+        // --- Crear Orden ---
         const newOrder = new Order({
-            client: client.uid || client._id,
+            client: client._id,
             restaurant: restaurantId,
+            deliveryType: finalDeliveryType,
             items: hydratedItems,
             total: totalOrder,
-            deliveryAddress: {
-                alias: selectedAddress.alias,
-                addressLine: selectedAddress.addressLine,
-                houseNumber: selectedAddress.houseNumber,
-                securityInfo: selectedAddress.securityInfo,
-                reference: selectedAddress.reference
-            },
-            paymentMethod
+            deliveryAddress: finalAddress,
+            paymentMethod,
+            promotion: activePromo ? activePromo._id : null
         });
 
         const savedOrder = await newOrder.save();
+        
+        // --- Generar Factura ---
         const invoiceCount = await Invoice.countDocuments();
         const invoiceNumber = `INV-${Date.now()}-${(invoiceCount + 1).toString().padStart(4, '0')}`;
 
         const newInvoice = new Invoice({
             invoiceNumber,
             order: savedOrder._id,
-            client: client.uid || client._id,
+            client: client._id,
             clientName: client.name,
             restaurant: restaurantId,
             restaurantName: restaurant.name,
@@ -168,10 +250,9 @@ export const createOrder = async (req, res) => {
             paymentMethod
         });
 
-
-
         const savedInvoice = await newInvoice.save();
 
+        // --- Notificación y Email ---
         await notificationService.createAndEmit(
             String(savedOrder.client),
             'PEDIDO_RECIBIDO',
@@ -180,26 +261,30 @@ export const createOrder = async (req, res) => {
             savedOrder._id,
             'Order'
         );
-        console.log("Factura guardada con nombre:", savedInvoice.restaurantName);
 
         generatePDFBuffer(savedInvoice)
-            .then(pdfBuffer => {
-                return sendInvoiceEmail(client.email, pdfBuffer, savedInvoice.invoiceNumber);
-            })
-            .then(() => console.log(`Factura enviada a ${client.email}`))
-            .catch(err => console.error("Error crítico enviando factura:", err));
+            .then(pdfBuffer => sendInvoiceEmail(client.email, pdfBuffer, savedInvoice.invoiceNumber))
+            .catch(err => console.error("Error enviando factura:", err));
 
         res.status(201).json({
             success: true,
-            message: "Pedido y Factura creados correctamente: Se ha enviado un correo con la factura adjunta",
+            message: "Pedido creado correctamente",
             order: savedOrder,
             invoice: savedInvoice
         });
 
     } catch (error) {
-        res.status(500).json({
+        console.error("Error en createOrder:", error);
+        
+        // Determinar si es un error de validación/lógica (como falta de stock) o de servidor
+        const statusCode = error.message.includes("stock") || 
+                           error.message.includes("disponible") || 
+                           error.message.includes("promoción") 
+                           ? 400 : 500;
+
+        res.status(statusCode).json({
             success: false,
-            message: "Error al procesar el pedido",
+            message: error.message || "Error al procesar el pedido",
             error: error.message
         });
     }
@@ -208,10 +293,9 @@ export const createOrder = async (req, res) => {
 export const getMyOrders = async (req, res) => {
     try {
         const client = req.user;
-        const clienteId = client.uid || client._id;
-
-        const orders = await Order.find({ client: clienteId })
+        const orders = await Order.find({ client: client._id })
             .populate('restaurant', 'name photo address')
+            .populate('items.productId', 'name photo')
             .populate('client', 'name email')
             .sort({ createdAt: -1 });
 
@@ -245,7 +329,7 @@ export const getOrderById = async (req, res) => {
         }
 
         const orderClientId = order.client?._id?.toString() || order.client?.toString();
-        const authClientId = authenticatedClient.uid?.toString() || authenticatedClient._id?.toString();
+        const authClientId = authenticatedClient._id.toString();
 
         if (orderClientId !== authClientId) {
             return res.status(403).json({
@@ -274,12 +358,19 @@ export const updateOrderStatus = async (req, res) => {
         const user = req.user;
 
         const order = await Order.findById(id);
-
         if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: "Pedido no encontrado"
-            });
+            return res.status(404).json({ success: false, message: "Pedido no encontrado" });
+        }
+
+        // Enforce MANAGER_ROLE restriction for updates
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== order.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para gestionar pedidos de este restaurante"
+                });
+            }
         }
 
         const normalizedStatus = status.toUpperCase();
@@ -340,6 +431,18 @@ export const updateOrderStatus = async (req, res) => {
 export const createOrderAdmin = async (req, res) => {
     try {
         const { clientId, restaurantId, items, paymentMethod, deliveryAddress, deliveryType } = req.body;
+        const user = req.user;
+
+        // Enforce MANAGER_ROLE restriction for creation
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== restaurantId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Solo puedes crear pedidos para tu propio restaurante"
+                });
+            }
+        }
 
         console.log("BODY RECIBIDO:", req.body);
 
@@ -447,14 +550,32 @@ export const updateOrderAdmin = async (req, res) => {
     try {
         const { id } = req.params;
         const { clientId, restaurantId, items, paymentMethod, deliveryAddress, deliveryType } = req.body;
+        const user = req.user;
 
         const order = await Order.findById(id);
         if (!order) {
             return res.status(404).json({ success: false, message: "Pedido no encontrado" });
         }
 
-        const updateData = {};
+        // Enforce MANAGER_ROLE restriction for updates
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== order.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para actualizar pedidos de este restaurante"
+                });
+            }
+            if (restaurantId && restaurantId.toString() !== employee.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No puedes transferir un pedido a otro restaurante"
+                });
+            }
+        }
 
+        const updateData = {};
+        // ... rest of method
         if (clientId) updateData.client = clientId;
         if (restaurantId) updateData.restaurant = restaurantId;
         if (paymentMethod) updateData.paymentMethod = paymentMethod;
@@ -513,19 +634,39 @@ export const updateOrderAdmin = async (req, res) => {
 
 export const getOrders = async (req, res) => {
     try {
-        const { page = 1, limit = 10, restaurante } = req.query;
+        const { page = 1, limit = 20, restaurante, isActive } = req.query;
+        const user = req.user;
+        const filter = {};
 
-        const filter = { status: { $ne: "CANCELLED" } };
-
-        if (restaurante) {
+        // Enforce MANAGER_ROLE restriction for listing
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de empleado para este manager."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        } else if (restaurante) {
             filter.restaurant = restaurante;
         }
+
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
+        }
         
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+
         const orders = await Order.find(filter)
             .populate('client', 'name email') 
             .populate('restaurant', 'name')
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
             .sort({ createdAt: -1 });
 
         const total = await Order.countDocuments(filter);
@@ -535,9 +676,9 @@ export const getOrders = async (req, res) => {
             data: orders,
             pagination: {
                 totalRecords: total,
-                totalPages: Math.ceil(total / limit),
-                currentPage: parseInt(page),
-                limit: parseInt(limit)
+                totalPages: Math.ceil(total / parsedLimit),
+                currentPage: parsedPage,
+                limit: parsedLimit
             }
         });
     } catch (error) {
@@ -552,25 +693,35 @@ export const getOrders = async (req, res) => {
 export const deleteOrder = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const order = await Order.findById(id);
-
         if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: "Pedido no encontrado"
-            });
+            return res.status(404).json({ success: false, message: "Pedido no encontrado" });
+        }
+
+        // Enforce MANAGER_ROLE restriction for deletion
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== order.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para eliminar pedidos de este restaurante"
+                });
+            }
         }
 
         const updatedOrder = await Order.findByIdAndUpdate(
             id,
-            {
-                isActive: false,
-                status: 'CANCELADO'
-            },
+            { isActive: false, status: 'CANCELADO' },
             { new: true }
         );
 
+        if (!updatedOrder) {
+            return res.status(404).json({ success: false, message: "Pedido no encontrado" });
+        }
+
+        // Restaurar notificación de cancelación
         await notificationService.createAndEmit(
             String(updatedOrder.client),
             ORDER_NOTIFICATION_MAP.CANCELADO.type,
@@ -582,14 +733,13 @@ export const deleteOrder = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: "Pedido desactivado y marcado como cancelado correctamente",
+            message: "Pedido cancelado correctamente",
             order: updatedOrder
         });
-
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: "Error al intentar eliminar (desactivar) el pedido",
+            message: "Error al eliminar el pedido",
             error: error.message
         });
     }

@@ -28,7 +28,7 @@ const inventorySchema = new mongoose.Schema({
     },
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Restaurant',
+        ref: 'Restaurante',
         required: [true, 'El restaurante es obligatorio']
     },
     isActive: {

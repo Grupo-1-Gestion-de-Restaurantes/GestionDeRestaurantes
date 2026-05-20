@@ -1,6 +1,7 @@
 import Restaurante from "../restaurants/restaurant.model.js";
 import Reservation from "../reservations/reservation.model.js";
 import Order from "../orders/order.model.js";
+import Employee from "../employees/employee.model.js";
 import mongoose from "mongoose";
 
 const parseActiveFilter = (value) => {
@@ -48,14 +49,30 @@ export const createRestaurante = async (req, res) => {
 
 export const getRestaurantes = async (req, res) => {
   try {
-    const { page = 1, limit = 10, isActive, search = '' } = req.query;
+    const { page = 1, limit = 20, isActive, search = '',  city, rating, categories} = req.query;
+
+    const filter = {};
+    const user = req.user;
+
+    if (city) {
+      filter.city = { $regex: city, $options: 'i' };
+    }
+
+    if (rating) {
+      filter.rating = { $gte: Number(rating) };
+    }
+
+    if (categories) {
+      filter.categories = categories;
+    }
 
     const normalizedIsActive = parseActiveFilter(isActive);
-    const filter = {};
     const normalizedSearch = String(search).trim();
 
     if (normalizedIsActive !== undefined) {
       filter.isActive = normalizedIsActive;
+    } else if (isActive === undefined) {
+      filter.isActive = true;
     }
 
     if (normalizedSearch) {
@@ -67,8 +84,20 @@ export const getRestaurantes = async (req, res) => {
       ];
     }
 
+    if (user.role === 'MANAGER_ROLE') {
+      const Employee = (await import('../employees/employee.model.js')).default;
+      const employee = await Employee.findOne({ userId: user.id });
+      if (!employee) {
+        return res.status(403).json({
+          success: false,
+          message: "No se encontró información de tu restaurante."
+        });
+      }
+      filter._id = employee.restaurant;
+    }
+
     const parsedPage = parseInt(page, 10) || 1;
-    const parsedLimit = parseInt(limit, 10) || 10;
+    const parsedLimit = parseInt(limit, 10) || 20;
 
     const restaurantes = await Restaurante.find(filter)
       .limit(parsedLimit)
@@ -84,8 +113,7 @@ export const getRestaurantes = async (req, res) => {
         currentPage: parsedPage,
         totalPages: Math.ceil(total / parsedLimit),
         totalRecords: total,
-        limit: parsedLimit,
-        restaurantes
+        limit: parsedLimit
       }
     })
   } catch (error) {
@@ -100,6 +128,17 @@ export const getRestaurantes = async (req, res) => {
 export const getRestauranteById = async (req, res) => {
   try {
     const { id } = req.params;
+    const user = req.user;
+
+    if (user.role === 'MANAGER_ROLE') {
+      const employee = await Employee.findOne({ userId: user.id });
+      if (!employee || employee.restaurant.toString() !== id) {
+        return res.status(403).json({
+          success: false,
+          message: "No tienes permiso para ver otros restaurantes."
+        });
+      }
+    }
 
     const restaurante = await Restaurante.findById(id);
 
@@ -122,6 +161,7 @@ export const getRestauranteById = async (req, res) => {
     });
   }
 };
+
 
 export const updateRestaurante = async (req, res) => {
   try {

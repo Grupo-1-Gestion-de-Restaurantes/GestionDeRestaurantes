@@ -45,7 +45,7 @@ export const validateRestaurantAdmin = async (req, res, next) => {
 
 export const validateGetGeneralReport = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     checkValidators,
 ];
 

@@ -1,6 +1,8 @@
 import { Router } from 'express';
-import { createClient, getClients , getClientById, updateClient, addAddressToClient, changeClientStatus, getMyInfo } from './client.controller.js';
-import { validateGetClients, validateCreateClient, validateClientById,validateUpdateClientRequest, validateAddAddressToClient, validateClientStatusChange, validateGetMyInfo } from '../../middlewares/client-validators.js';
+import { createClient, getClients , getClientById, updateClient, updateClientById, addAddressToClient, changeClientStatus, getMyInfo } from './client.controller.js';
+import { validateGetClients, validateCreateClient, validateClientById,validateUpdateClientRequest, validateUpdateClientByIdRequest, validateAddAddressToClient, validateClientStatusChange, validateGetMyInfo } from '../../middlewares/client-validators.js';
+import { syncClient } from '../../middlewares/syncClient.js';
+import { syncClientUpdate } from '../../middlewares/syncClientUpdate.js';
 
 const router = Router();
 
@@ -29,6 +31,11 @@ router.put(
     '/addAddress',
     validateAddAddressToClient,
     addAddressToClient
+);
+router.put(
+    '/:id',
+    validateUpdateClientByIdRequest,
+    updateClientById
 );
 
 router.put('/:id/activate', validateClientStatusChange, changeClientStatus);

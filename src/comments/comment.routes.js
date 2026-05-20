@@ -14,6 +14,7 @@ import {
     validateUpdateCommentRequest,
     validateCommentStatusChange,
     validateGetCommentById,
+    validateGetComments,
     validateGetCommentsDish,
     validateGetCommentsRestaurant
 } from '../../middlewares/comment-validators.js';
@@ -21,7 +22,8 @@ import {
 const router = Router();
 
 router.get(
-    '/', 
+    '/',
+    validateGetComments,
     getComments
 );
 
@@ -62,9 +64,8 @@ router.put(
 );
 
 router.put(
-    '/desactivate/:id', 
+    '/deactivate/:id',
     validateCommentStatusChange,
     changeCommentStatus
 );
-
 export default router;

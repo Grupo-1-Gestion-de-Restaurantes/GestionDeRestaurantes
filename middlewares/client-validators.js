@@ -3,6 +3,7 @@ import { checkValidators } from './checkValidators.js';
 import { validateJWT } from './validate-JWT.js';
 import { syncClient } from './syncClient.js';
 import { requireRole } from './validate-role.js';
+import { syncClientUpdate } from './syncClientUpdate.js';
 
 // Validaciones para crear campos (field)
 export const validateCreateClient = [
@@ -19,7 +20,7 @@ export const validateCreateClient = [
         .isEmail().withMessage('Debe ser un correo electrónico válido'),
     body('phone')
         .trim()
-        .matches(/^[0-9]{8,15}$/).withMessage('Ingrese un número de teléfono válido (8 a 15 dígitos)'),
+        .matches(/^[0-9]{0,15}$/).withMessage('Ingrese un número de teléfono válido (0 a 15 dígitos)'),
     body('birthdate')
         .notEmpty().withMessage('La fecha de nacimiento es obligatoria')
         .isISO8601().withMessage('Formato de fecha inválido (AAAA-MM-DD)'),
@@ -39,18 +40,18 @@ export const validateCreateClient = [
 
 export const validateUpdateClientRequest = [
     validateJWT,
-    requireRole('ADMIN_ROLE', 'CLIENT_ROLE'),
-    syncClient,
+    syncClientUpdate,
+    requireRole('ADMIN_ROLE', 'CLIENT_ROLE', 'USER_ROLE'),
     body('name')
         .optional()
         .trim()
         .notEmpty()
         .withMessage('El nombre no puede estar vacío'),
     body('phone')
-        .optional()
+        .optional({ nullable: true, checkFalsy: true })
         .trim()
-        .matches(/^[0-9]{7,15}$/)
-        .withMessage('Teléfono inválido'),
+        .matches(/^[0-9]{0,15}$/)
+        .withMessage('Teléfono inválido (0-15 dígitos)'),
     body('birthdate')
         .optional()
         .isISO8601()
@@ -66,6 +67,40 @@ export const validateUpdateClientRequest = [
         .optional()
         .isMongoId()
         .withMessage('El ID de la dirección debe ser un ObjectId válido de MongoDB'),
+    checkValidators
+];
+
+export const validateUpdateClientByIdRequest = [
+    validateJWT,
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
+    param('id')
+        .notEmpty().withMessage('El ID es obligatorio')
+        .isString().withMessage('El ID debe ser una cadena de texto'),
+    body('name')
+        .optional()
+        .trim()
+        .notEmpty()
+        .withMessage('El nombre no puede estar vacío'),
+    body('email')
+        .optional()
+        .trim()
+        .isEmail().withMessage('Debe ser un correo electrónico válido'),
+    body('phone')
+        .optional({ nullable: true, checkFalsy: true })
+        .trim()
+        .matches(/^[0-9]{0,15}$/)
+        .withMessage('Teléfono inválido (0-15 dígitos)'),
+    body('birthdate')
+        .optional()
+        .isISO8601()
+        .withMessage('Fecha inválida'),
+    body('gender')
+        .optional()
+        .isIn(['Masculino', 'Femenino', 'Otro']),
+    body('addresses')
+        .optional()
+        .isArray()
+        .withMessage('Addresses debe ser un arreglo'),
     checkValidators
 ];
 
@@ -95,14 +130,14 @@ export const validateClientStatusChange = [
 
 export const validateGetClients = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     checkValidators,
 ]
 
 // Validación para obtener cliente por ID
 export const validateClientById = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     param('id')
         .notEmpty().withMessage('El ID es obligatorio')
         .isString().withMessage('El ID debe ser una cadena de texto'),

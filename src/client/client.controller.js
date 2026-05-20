@@ -1,5 +1,22 @@
-import { parse } from 'dotenv';
 import Client from './client.model.js';
+import Order from '../orders/order.model.js';
+import Employee from '../employees/employee.model.js';
+
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
 
 export const createClient = async (req, res) => {
     try {
@@ -33,7 +50,8 @@ export const createClient = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(400).json({
+        const status = error.name === 'ValidationError' ? 400 : 500;
+        res.status(status).json({
             success: false,
             message: 'Error al registrar el cliente',
             error: error.message
@@ -44,11 +62,28 @@ export const createClient = async (req, res) => {
 export const getClients = async (req, res) => {
 
     try {
-        const { page = 1, limit = 10, isActive, search = '' } = req.query;
-
+        const { page = 1, limit = 20, isActive, search = '' } = req.query;
+        const user = req.user;
         const filter = {};
-        if (isActive !== undefined) {
-            filter.isActive = isActive === 'true';
+
+
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            const orderClients = await Order.distinct('client', { restaurant: employee.restaurant });
+            filter._id = { $in: orderClients };
+        }
+
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
         }
 
         if (search) {
@@ -60,16 +95,13 @@ export const getClients = async (req, res) => {
             ];
         }
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
-        }
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
 
         const clients = await Client.find(filter)
-            .limit(options.limit)
-            .skip((options.page - 1) * options.limit)
-            .sort(options.sort);
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Client.countDocuments(filter);
 
@@ -77,10 +109,10 @@ export const getClients = async (req, res) => {
             success: true,
             data: clients,
             pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit
+                limit: parsedLimit
             }
         })
     } catch (error) {
@@ -97,6 +129,7 @@ export const getClients = async (req, res) => {
 export const getClientById = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const client = await Client.findById(id);
 
@@ -105,6 +138,24 @@ export const getClientById = async (req, res) => {
                 success: false,
                 message: 'Cliente no encontrado',
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            const hasOrder = await Order.exists({ client: id, restaurant: employee.restaurant });
+            if (!hasOrder) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Este cliente no tiene historial en tu restaurante."
+                });
+            }
         }
 
         res.status(200).json({
@@ -121,37 +172,58 @@ export const getClientById = async (req, res) => {
 };
 
 
-
 export const updateClient = async (req, res) => {
     try {
-        const client = req.user;
+        const clientEmail = req.user.email;
+        
+        console.log("=== UPDATE CLIENT DEBUG ===");
+        console.log("clientEmail from req.user:", clientEmail);
+        console.log("req.body:", JSON.stringify(req.body));
+        
         const { address, ...otherData } = req.body;
-
-        client.set(otherData);
-
-        if (address && address._id) {
-            const addressToEdit = client.addresses.id(address._id);
-
-            if (addressToEdit) {
-                addressToEdit.set(address);
-            } else {
-                return res.status(404).json({
-                    success: false,
-                    message: "No se encontró la dirección con ese ID"
-                });
-            }
+        console.log("otherData after first destructure:", JSON.stringify(otherData));
+        
+        const { address: addr, ...rest } = otherData;
+        console.log("rest after second destructure:", JSON.stringify(rest));
+        
+        const updateFields = { ...rest };
+        console.log("updateFields to apply:", JSON.stringify(updateFields));
+        
+        if (address) {
+            updateFields.addresses = [address];
         }
-
+        
+        // Buscar el cliente y actualizar con save() en lugar de findOneAndUpdate
+        const client = await Client.findOne({ email: clientEmail });
+        
+        if (!client) {
+            console.log("CLIENT NOT FOUND with email:", clientEmail);
+            return res.status(404).json({ success: false, message: "Cliente no encontrado" });
+        }
+        
+        console.log("Client found, current phone:", client.phone);
+        console.log("Applying updateFields:", updateFields);
+        
+        // Aplicar cada campo del updateFields
+        for (const [key, value] of Object.entries(updateFields)) {
+            client[key] = value;
+        }
+        
+        console.log("Client after setting fields, phone:", client.phone);
+        
         await client.save();
-
+        console.log("Client saved successfully, new phone:", client.phone);
+        
         res.status(200).json({
             success: true,
             message: "Perfil actualizado correctamente",
             data: client
         });
-
     } catch (error) {
-        res.status(500).json({
+        console.error("=== UPDATE CLIENT ERROR ===");
+        console.error(error);
+        const status = error.name === 'ValidationError' ? 400 : 500;
+        res.status(status).json({
             success: false,
             message: "Error al actualizar",
             error: error.message
@@ -159,6 +231,43 @@ export const updateClient = async (req, res) => {
     }
 };
 
+export const updateClientById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { addresses, ...otherData } = req.body;
+
+        const client = await Client.findOne({ _id: id });
+
+        if (!client) {
+            return res.status(404).json({
+                success: false,
+                message: "Cliente no encontrado"
+            });
+        }
+
+        if (otherData.name !== undefined) client.name = otherData.name;
+        if (otherData.email !== undefined) client.email = otherData.email;
+        if (otherData.phone !== undefined) client.phone = otherData.phone;
+        if (otherData.birthdate !== undefined) client.birthdate = otherData.birthdate;
+        if (otherData.gender !== undefined) client.gender = otherData.gender;
+        if (addresses !== undefined) client.addresses = addresses;
+
+        await client.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Cliente actualizado correctamente",
+            data: client
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Error al actualizar el cliente",
+            error: error.message
+        });
+    }
+};
 
 // Actualizar cliente
 export const addAddressToClient = async (req, res) => {
@@ -172,25 +281,29 @@ export const addAddressToClient = async (req, res) => {
             });
         }
 
-        client.set(req.body);
-
-
-        if (req.body.address) {
-            client.addresses.push(req.body.address);
+        if (!req.body.address) {
+            return res.status(400).json({
+                success: false,
+                message: "La dirección es obligatoria"
+            });
         }
 
-        await client.save();
+        const updatedClient = await Client.findByIdAndUpdate(
+            client._id,
+            { $push: { addresses: req.body.address } },
+            { new: true, runValidators: true }
+        );
 
         res.status(200).json({
             success: true,
-            message: "Perfil actualizado correctamente",
-            data: client
+            message: "Dirección agregada correctamente",
+            data: updatedClient
         });
 
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: "Error al actualizar el cliente",
+            message: "Error al agregar la dirección",
             error: error.message
         });
     }
@@ -236,17 +349,10 @@ export const getMyInfo = async (req, res) => {
         const client = req.user;
 
         if (!client) {
-            return res.status(404).json({
-                success: false,
-                message: 'Información de perfil no encontrada',
-            });
+            return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'Perfil obtenido exitosamente',
-            data: client
-        });
+        res.status(200).json({ success: true, data: client });
     } catch (error) {
         res.status(500).json({
             success: false,

@@ -1,9 +1,38 @@
 import Comment from "./comment.model.js";
 import Restaurante from "../restaurants/restaurant.model.js";
+import Employee from "../employees/employee.model.js";
+
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
 
 export const createComment = async (req, res) => {
     try {
         const commentData = req.body;
+        const user = req.user;
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE' && commentData.restaurantId) {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== commentData.restaurantId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No puedes crear comentarios para otros restaurantes."
+                });
+            }
+        }
 
         const comment = new Comment(commentData);
         await comment.save();
@@ -43,19 +72,33 @@ export const createComment = async (req, res) => {
 export const getComments = async (req, res) => {
     try {
         const { page = 1, limit = 10, isActive, search = '', restaurantId } = req.query;
-
+        const user = req.user;
         const filter = {};
-        if (isActive !== undefined) {
-            filter.isActive = isActive === 'true';
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter.restaurantId = employee.restaurant;
+        } else if (restaurantId) {
+            filter.restaurantId = restaurantId;
         }
 
-        if (restaurantId) {
-            filter.restaurantId = restaurantId;
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
         }
 
         if (search) {
             filter.$or = [
-                { text: { $regex: search, $options: 'i' } }
+                { comment: { $regex: search, $options: 'i' } }
             ];
         }
 
@@ -96,6 +139,7 @@ export const getComments = async (req, res) => {
 export const getCommentById = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const comment = await Comment.findById(id);
 
@@ -104,6 +148,17 @@ export const getCommentById = async (req, res) => {
                 success: false,
                 message: 'comentario no encontrado',
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE' && comment.restaurantId) {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== comment.restaurantId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver comentarios de otros restaurantes."
+                });
+            }
         }
 
         res.status(200).json({
@@ -146,6 +201,18 @@ export const getCommentsDish = async (req, res) => {
 export const getCommentsRestaurants = async (req, res) => {
     try {
         const { restaurantId } = req.params;
+        const user = req.user;
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== restaurantId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver comentarios de otros restaurantes."
+                });
+            }
+        }
 
         const comments = await Comment.find({
             restaurantId,
@@ -170,6 +237,7 @@ export const getCommentsRestaurants = async (req, res) => {
 export const updateComment = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const currentComment = await Comment.findById(id);
         if (!currentComment) {
@@ -177,6 +245,17 @@ export const updateComment = async (req, res) => {
                 success: false,
                 message: "Comentario no encontrado",
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE' && currentComment.restaurantId) {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== currentComment.restaurantId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para actualizar comentarios de otros restaurantes."
+                });
+            }
         }
 
         const updateData = { ...req.body };
@@ -195,7 +274,7 @@ export const updateComment = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error al actualizar comentario",
-            error: error.message,
+            error: error.message
         });
     }
 };
@@ -203,22 +282,35 @@ export const updateComment = async (req, res) => {
 export const changeCommentStatus = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         // Detectar si es activate o deactivate desde la URL
         const isActive = req.url.includes('/activate');
         const action = isActive ? 'activado' : 'desactivado';
+
+        const commentToUpdate = await Comment.findById(id);
+        if (!commentToUpdate) {
+            return res.status(404).json({
+                success: false,
+                message: 'Comentario no encontrado',
+            });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE' && commentToUpdate.restaurantId) {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== commentToUpdate.restaurantId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para gestionar el estado de comentarios de otros restaurantes."
+                });
+            }
+        }
 
         const comment = await Comment.findByIdAndUpdate(
             id,
             { isActive },
             { new: true }
         );
-
-        if (!comment) {
-            return res.status(404).json({
-                success: false,
-                message: 'Comentario no encontrado',
-            });
-        }
 
         res.status(200).json({
             success: true,

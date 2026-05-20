@@ -1,6 +1,6 @@
 import Client from "../src/client/client.model.js";
 
-export const syncClient = async (req, res, next) => {
+export const syncClientUpdate = async (req, res, next) => {
   try {
     if (!req.user?.id) {
       return res.status(400).json({
@@ -9,8 +9,10 @@ export const syncClient = async (req, res, next) => {
       });
     }
 
-    const { id, role, email, name, phone } = req.user;
+    const { id, role, email, name } = req.user;
 
+    // SOLO crear documento si no existe, NO modificar campos existentes
+    // Esto permite que el controlador updateClient actualice phone libremente
     const user = await Client.findOneAndUpdate(
       { email: email },
       {
@@ -18,7 +20,6 @@ export const syncClient = async (req, res, next) => {
           _id: id,
           email,
           name,
-          phone,
           isActive: true,
         },
       },

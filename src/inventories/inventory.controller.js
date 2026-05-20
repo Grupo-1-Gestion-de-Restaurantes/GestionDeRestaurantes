@@ -1,6 +1,22 @@
 import Inventory from './inventory.model.js';
 import Employee from '../employees/employee.model.js';
 
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
+
 export const createInventoryItem = async (req, res) => {
     try {
 
@@ -34,21 +50,48 @@ export const createInventoryItem = async (req, res) => {
 
 export const getInventory = async (req, res) => {
     try {
-        const { page = 1, limit = 10, isActive = true, restaurant } = req.query;
-        const filter = { isActive };
+        const { page = 1, limit = 20, isActive, restaurant } = req.query;
+        const user = req.user;
+        const filter = {};
 
-        if (restaurant) filter.restaurant = restaurant;
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
+        }
 
-        const items = await Inventory.find(filter).sort({ name: 1 });
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
+        }
+
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+
+        const items = await Inventory.find(filter)
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ name: 1 });
+
         const total = await Inventory.countDocuments(filter);
         res.status(200).json({
             success: true,
             data: items,
             pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit: parseInt(limit)
+                limit: parsedLimit
             }
         });
     } catch (error) {
@@ -64,6 +107,17 @@ export const getInventoryById = async (req, res) => {
     try {
         const item = await Inventory.findOne({ _id: req.params.id, isActive: true });
         if (!item) return res.status(404).json({ success: false, message: 'Item no encontrado' });
+
+        // Enforce MANAGER_ROLE restriction
+        if (req.user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: req.user.id });
+            if (!employee || employee.restaurant.toString() !== item.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver items de otros restaurantes."
+                });
+            }
+        }
 
         res.status(200).json({ success: true, data: item });
     } catch (error) {

@@ -125,22 +125,55 @@ export const createEmployee = async (req, res) => {
     }
 }
 
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
+
 export const getEmployees = async (req, res) => {
     try {
 
-        const { page = 1, limit = 10, isActive = true } = req.query;
-        const filter = { isActive };
+        const { page = 1, limit = 20, isActive } = req.query;
+        const user = req.user;
+        const filter = {};
 
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
-        };
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        }
+
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
+        }
+
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
 
         const employees = await Employee.find(filter)
-            .limit(options.limit)
-            .skip((options.page - 1) * options.limit)
-            .sort(options.sort);
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Employee.countDocuments(filter);
 
@@ -148,10 +181,10 @@ export const getEmployees = async (req, res) => {
             success: true,
             data: employees,
             pagination: {
-                currentPage: options.page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit: options.limit
+                limit: parsedLimit
             }
         });
 
@@ -166,16 +199,26 @@ export const getEmployees = async (req, res) => {
 
 export const getEmployeeById = async (req, res) => {
     try {
-
         const employeeId = req.params.id;
+        const user = req.user;
         const employee = await Employee.findById(employeeId);
-
 
         if (!employee) {
             return res.status(404).json({
                 success: false,
                 message: 'Empleado no encontrado'
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== employee.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver empleados de otros restaurantes."
+                });
+            }
         }
 
         res.status(200).json({
@@ -197,18 +240,39 @@ export const updateEmployee = async (req, res) => {
     try {
         const employeeId = req.params.id;
         const { restaurant, specialty } = req.body;
-        const updateData = {};
-        if (restaurant !== undefined) updateData.restaurant = restaurant;
-        if (specialty !== undefined) updateData.specialty = specialty;
+        const user = req.user;
 
-        const updatedEmployee = await Employee.findByIdAndUpdate(employeeId, updateData, { new: true, runValidators: true });
-
-        if (!updatedEmployee) {
+        const employeeToUpdate = await Employee.findById(employeeId);
+        if (!employeeToUpdate) {
             return res.status(404).json({
                 success: false,
                 message: 'Empleado no encontrado'
             });
         }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== employeeToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para actualizar empleados de otros restaurantes."
+                });
+            }
+            // A manager cannot move an employee to another restaurant
+            if (restaurant && restaurant.toString() !== manager.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No puedes transferir un empleado a otro restaurante."
+                });
+            }
+        }
+
+        const updateData = {};
+        if (restaurant !== undefined) updateData.restaurant = restaurant;
+        if (specialty !== undefined) updateData.specialty = specialty;
+
+        const updatedEmployee = await Employee.findByIdAndUpdate(employeeId, updateData, { new: true, runValidators: true });
 
         res.status(200).json({
             success: true,
@@ -229,15 +293,28 @@ export const changeEmployeeStatus = async (req, res) => {
     try {
         const employeeId = req.params.id;
         const { isActive } = req.body;
+        const user = req.user;
 
-        const updatedEmployee = await Employee.findByIdAndUpdate(employeeId, { isActive }, { new: true });
-
-        if (!updatedEmployee) {
+        const employeeToUpdate = await Employee.findById(employeeId);
+        if (!employeeToUpdate) {
             return res.status(404).json({
                 success: false,
                 message: 'Empleado no encontrado'
             });
         }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== employeeToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para gestionar el estado de empleados de otros restaurantes."
+                });
+            }
+        }
+
+        const updatedEmployee = await Employee.findByIdAndUpdate(employeeId, { isActive }, { new: true });
 
         // Desactivar o activar el usuario en AuthService
         // Pendiente de hacer endpoint en AuthService para esto, por ahora solo se hace el cambio en Employee

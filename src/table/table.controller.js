@@ -1,5 +1,6 @@
 import Table from './table.model.js';
 import Restaurant from '../restaurants/restaurant.model.js';
+import Employee from '../employees/employee.model.js';
 
 const parseActiveFilter = (value) => {
     if (value === undefined || value === null || value === '' || value === 'all') {
@@ -21,6 +22,18 @@ export const createTable = async (req, res) => {
     try {
         console.log("BODY QUE LLEGA:", req.body);
         const tableData = req.body;
+        const user = req.user;
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee || employee.restaurant.toString() !== tableData.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Solo puedes crear mesas para tu propio restaurante."
+                });
+            }
+        }
 
         const table = new Table(tableData);
         await table.save();
@@ -42,30 +55,40 @@ export const createTable = async (req, res) => {
 
 export const getTables = async (req, res) => {
     try {
-        const { page = 1, limit = 10, isActive, restaurante } = req.query;
-
+        const { page = 1, limit = 20, isActive, restaurante } = req.query;
+        const user = req.user;
         const filter = {};
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            filter.restaurant = employee.restaurant;
+        } else if (restaurante) {
+            filter.restaurant = restaurante;
+        }
+
         const normalizedIsActive = parseActiveFilter(isActive);
 
         if (normalizedIsActive !== undefined) {
             filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
         }
         
-        if (restaurante) {
-            filter.restaurante = restaurante;
-        }
-
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
-        };
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
 
         const tables = await Table.find(filter)
             .populate('restaurant', 'name')
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
-            .sort(options.sort);
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
 
         const total = await Table.countDocuments(filter);
 
@@ -73,10 +96,10 @@ export const getTables = async (req, res) => {
             success: true,
             data: tables,
             pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
                 totalRecords: total,
-                limit
+                limit: parsedLimit
             }
         });
     } catch (error) {
@@ -91,6 +114,7 @@ export const getTables = async (req, res) => {
 export const getTableById = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const table = await Table.findById(id).populate('restaurant', 'name');
 
@@ -99,6 +123,17 @@ export const getTableById = async (req, res) => {
                 success: false,
                 message: 'Mesa no encontrada',
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== table.restaurant._id.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver mesas de otros restaurantes."
+                });
+            }
         }
 
         res.status(200).json({
@@ -117,6 +152,7 @@ export const getTableById = async (req, res) => {
 export const updateTable = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const currentTable = await Table.findById(id);
         if (!currentTable) {
@@ -124,6 +160,17 @@ export const updateTable = async (req, res) => {
                 success: false,
                 message: "Mesa no encontrada",
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== currentTable.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para actualizar mesas de otros restaurantes."
+                });
+            }
         }
 
         const updateData = { ...req.body };
@@ -150,26 +197,39 @@ export const updateTable = async (req, res) => {
 export const changeTableStatus = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         const isActive = req.url.includes('/activate');
         const action = isActive ? 'activada' : 'desactivada';
 
-        const table = await Table.findByIdAndUpdate(
-            id,
-            { isActive },
-            { new: true }
-        );
-
-        if (!table) {
+        const tableToUpdate = await Table.findById(id);
+        if (!tableToUpdate) {
             return res.status(404).json({
                 success: false,
                 message: 'Mesa no encontrada',
             });
         }
 
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== tableToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para cambiar el estado de mesas de otros restaurantes."
+                });
+            }
+        }
+
+        const updatedTable = await Table.findByIdAndUpdate(
+            id,
+            { isActive },
+            { new: true }
+        );
+
         res.status(200).json({
             success: true,
             message: `Mesa ${action} exitosamente`,
-            data: table,
+            data: updatedTable,
         });
     } catch (error) {
         res.status(500).json({
@@ -184,26 +244,39 @@ export const changeTableAvailability = async (req, res) => {
     try {
         const { id } = req.params;
         const { disponibilidad } = req.body;
+        const user = req.user;
 
-        const table = await Table.findByIdAndUpdate(
-            id,
-            { disponibilidad },
-            { new: true }
-        );
-
-        if (!table) {
+        const tableToUpdate = await Table.findById(id);
+        if (!tableToUpdate) {
             return res.status(404).json({
                 success: false,
                 message: 'Mesa no encontrada',
             });
         }
 
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== tableToUpdate.restaurant.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para cambiar la disponibilidad de mesas de otros restaurantes."
+                });
+            }
+        }
+
+        const updatedTable = await Table.findByIdAndUpdate(
+            id,
+            { disponibilidad },
+            { new: true }
+        );
+
         const status = disponibilidad ? 'disponible' : 'ocupada';
 
         res.status(200).json({
             success: true,
             message: `Mesa marcada como ${status}`,
-            data: table,
+            data: updatedTable,
         });
     } catch (error) {
         res.status(500).json({
@@ -217,7 +290,19 @@ export const changeTableAvailability = async (req, res) => {
 export const getTablesByRestaurant = async (req, res) => {
     try {
         const { restaurantId } = req.params;
-        const { page = 1, limit = 10, isActive } = req.query;
+        const { page = 1, limit = 20, isActive } = req.query;
+        const user = req.user;
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const manager = await Employee.findOne({ userId: user.id });
+            if (!manager || manager.restaurant.toString() !== restaurantId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No tienes permiso para ver mesas de este restaurante."
+                });
+            }
+        }
 
         const restaurantExists = await Restaurant.findById(restaurantId);
         if (!restaurantExists) {
@@ -233,12 +318,15 @@ export const getTablesByRestaurant = async (req, res) => {
         if (normalizedIsActive !== undefined) {
             filter.isActive = normalizedIsActive;
         }
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        const skip = (parsedPage - 1) * parsedLimit;
 
         const [tables, total] = await Promise.all([
             Table.find(filter)
                 .populate('restaurant', 'name')
-                .limit(parseInt(limit))
+                .limit(parsedLimit)
                 .skip(skip)
                 .sort({ tableNumber: 1 }), 
             Table.countDocuments(filter)
@@ -249,9 +337,9 @@ export const getTablesByRestaurant = async (req, res) => {
             data: tables,
             pagination: {
                 totalRecords: total,
-                totalPages: Math.ceil(total / limit),
-                currentPage: parseInt(page),
-                limit: parseInt(limit)
+                totalPages: Math.ceil(total / parsedLimit),
+                currentPage: parsedPage,
+                limit: parsedLimit
             }
         });
 

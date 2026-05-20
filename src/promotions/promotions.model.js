@@ -27,7 +27,7 @@ const promotionSchema = new mongoose.Schema({
     }],
     restaurant: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Restaurant',
+        ref: 'Restaurante',
         required: [true, 'El restaurante de la promoción es obligatorio']
     },
     scope: { // Para validar si aplica solo a eventos, pedidos o es para ambos
@@ -53,6 +53,10 @@ const promotionSchema = new mongoose.Schema({
             message: 'El estado de la promoción debe ser PENDING, APPROVED o REJECTED'
         },
         default: 'PENDING'
+    },
+    isOneTimeUse: {
+        type: Boolean,
+        default: false
     },
     isActive: {
         type: Boolean,
