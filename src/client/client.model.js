@@ -21,11 +21,14 @@ const clientSchema = mongoose.Schema(
             trim: true
         },
 
-        phone: {
+phone: {
             type: String,
             required: [true, "El teléfono es obligatorio"],
             trim: true,
-            match: [/^[0-9]{8,15}$/, "Ingrese un número de teléfono válido"]
+            validate: {
+                validator: function(v) { return /^[0-9]{0,15}$/.test(v); },
+                message: "Ingrese un número de teléfono válido (0-15 dígitos)"
+            }
         },
 
         birthdate: {

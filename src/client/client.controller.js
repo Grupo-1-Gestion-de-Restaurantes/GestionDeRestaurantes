@@ -66,7 +66,7 @@ export const getClients = async (req, res) => {
         const user = req.user;
         const filter = {};
 
-        // Enforce MANAGER_ROLE restriction - Only see clients who have ordered at their restaurant
+
         if (user.role === 'MANAGER_ROLE') {
             const employee = await Employee.findOne({ userId: user.id });
             if (!employee) {
@@ -174,36 +174,96 @@ export const getClientById = async (req, res) => {
 
 export const updateClient = async (req, res) => {
     try {
-        const client = req.user;
+        const clientEmail = req.user.email;
+        
+        console.log("=== UPDATE CLIENT DEBUG ===");
+        console.log("clientEmail from req.user:", clientEmail);
+        console.log("req.body:", JSON.stringify(req.body));
+        
         const { address, ...otherData } = req.body;
-
-        client.set(otherData);
-
-        if (address && address._id) {
-            const addressToEdit = client.addresses.id(address._id);
-
-            if (addressToEdit) {
-                addressToEdit.set(address);
-            } else {
-                return res.status(404).json({
-                    success: false,
-                    message: "No se encontró la dirección con ese ID"
-                });
-            }
+        console.log("otherData after first destructure:", JSON.stringify(otherData));
+        
+        const { address: addr, ...rest } = otherData;
+        console.log("rest after second destructure:", JSON.stringify(rest));
+        
+        const updateFields = { ...rest };
+        console.log("updateFields to apply:", JSON.stringify(updateFields));
+        
+        if (address) {
+            updateFields.addresses = [address];
         }
+        
+        // Buscar el cliente y actualizar con save() en lugar de findOneAndUpdate
+        const client = await Client.findOne({ email: clientEmail });
+        
+        if (!client) {
+            console.log("CLIENT NOT FOUND with email:", clientEmail);
+            return res.status(404).json({ success: false, message: "Cliente no encontrado" });
+        }
+        
+        console.log("Client found, current phone:", client.phone);
+        console.log("Applying updateFields:", updateFields);
+        
+        // Aplicar cada campo del updateFields
+        for (const [key, value] of Object.entries(updateFields)) {
+            client[key] = value;
+        }
+        
+        console.log("Client after setting fields, phone:", client.phone);
+        
+        await client.save();
+        console.log("Client saved successfully, new phone:", client.phone);
+        
+        res.status(200).json({
+            success: true,
+            message: "Perfil actualizado correctamente",
+            data: client
+        });
+    } catch (error) {
+        console.error("=== UPDATE CLIENT ERROR ===");
+        console.error(error);
+        const status = error.name === 'ValidationError' ? 400 : 500;
+        res.status(status).json({
+            success: false,
+            message: "Error al actualizar",
+            error: error.message
+        });
+    }
+};
+
+export const updateClientById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { addresses, ...otherData } = req.body;
+
+        const client = await Client.findOne({ _id: id });
+
+        if (!client) {
+            return res.status(404).json({
+                success: false,
+                message: "Cliente no encontrado"
+            });
+        }
+
+        if (otherData.name !== undefined) client.name = otherData.name;
+        if (otherData.email !== undefined) client.email = otherData.email;
+        if (otherData.phone !== undefined) client.phone = otherData.phone;
+        if (otherData.birthdate !== undefined) client.birthdate = otherData.birthdate;
+        if (otherData.gender !== undefined) client.gender = otherData.gender;
+        if (addresses !== undefined) client.addresses = addresses;
 
         await client.save();
 
         res.status(200).json({
             success: true,
-            message: "Perfil actualizado correctamente",
+            message: "Cliente actualizado correctamente",
             data: client
         });
 
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: "Error al actualizar",
+            message: "Error al actualizar el cliente",
             error: error.message
         });
     }
