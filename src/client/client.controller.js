@@ -118,16 +118,9 @@ export const getClientById = async (req, res) => {
 };
 
 
-
 export const updateClient = async (req, res) => {
     try {
         const client = req.user;
-        
-        // Evitar actualizar campos protegidos
-        delete req.body.email;
-        delete req.body.role;
-        delete req.body._id;
-
         const { address, ...otherData } = req.body;
 
         client.set(otherData);
@@ -154,15 +147,13 @@ export const updateClient = async (req, res) => {
         });
 
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({
+        res.status(500).json({
             success: false,
             message: "Error al actualizar",
             error: error.message
         });
     }
 };
-
 
 // Actualizar cliente
 export const addAddressToClient = async (req, res) => {

@@ -347,7 +347,7 @@ export const changeReservationStatus = async (req, res) => {
 
 export const getMyReservations = async (req, res) => {
     try {
-        const client = String(req.user.id);
+        const client = String(req.user._id);
         const { page = 1, limit = 10 } = req.query;
 
         const parsedPage = parseInt(page);

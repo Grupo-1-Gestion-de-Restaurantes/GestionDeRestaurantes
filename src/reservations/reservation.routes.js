@@ -9,6 +9,8 @@ import {
     validateReservationId 
 } from '../../middlewares/reservations-validators.js';
 
+import { syncClient } from '../../middlewares/syncClient.js';
+
 const router = Router();
 
 router.post(
@@ -26,6 +28,7 @@ router.get(
 router.get(
   '/my-reservations',
   validateJWT,
+  syncClient,
   getMyReservations
 );
 

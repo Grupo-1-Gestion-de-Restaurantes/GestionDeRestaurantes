@@ -17,23 +17,17 @@ export const syncClient = async (req, res, next) => {
       updateFields.phone = phone;
     }
 
-    const user = await Client.findOneAndUpdate(
-      { _id: id },
-      {
-        $set: updateFields,
-        $setOnInsert: {
-          _id: id,
-          isActive: true,
-        },
-      },
-      {
-        upsert: true,
-        new: true,
-        runValidators: false,
-        lean: false,
-        returnDocument: "after",
-      },
-    );
+const user = await Client.findOneAndUpdate(
+  { email: email },
+  {
+    $set: updateFields,
+    $setOnInsert: {
+      _id: id,
+      isActive: true,
+    },
+  },
+  { upsert: true, new: true, runValidators: false, returnDocument: "after" }
+);
 
     req.user = user;
     req.user.role = role;

@@ -70,7 +70,7 @@ export const createOrder = async (req, res) => {
             promotion 
         } = req.body;
 
-        const client = req.user; // Ya sincronizado por el middleware syncClient
+        const client = req.user;
         const stockDeductions = [];
 
         if (!client) {
