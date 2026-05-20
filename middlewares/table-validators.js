@@ -102,6 +102,6 @@ export const validateGetTablesByRestaurant = [
 
 export const validateGetTables = [
     validateJWT,
-    requireRole('ADMIN_ROLE',),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     checkValidators 
 ];

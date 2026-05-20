@@ -2,6 +2,22 @@ import Comment from "./comment.model.js";
 import Restaurante from "../restaurants/restaurant.model.js";
 import Employee from "../employees/employee.model.js";
 
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
+
 export const createComment = async (req, res) => {
     try {
         const commentData = req.body;
@@ -73,8 +89,11 @@ export const getComments = async (req, res) => {
             filter.restaurantId = restaurantId;
         }
 
-        if (isActive !== undefined) {
-            filter.isActive = isActive === 'true';
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
         }
 
         if (search) {

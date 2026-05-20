@@ -95,14 +95,14 @@ export const validateClientStatusChange = [
 
 export const validateGetClients = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     checkValidators,
 ]
 
 // Validación para obtener cliente por ID
 export const validateClientById = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     param('id')
         .notEmpty().withMessage('El ID es obligatorio')
         .isString().withMessage('El ID debe ser una cadena de texto'),

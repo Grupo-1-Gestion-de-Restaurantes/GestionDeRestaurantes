@@ -1,4 +1,22 @@
 import Client from './client.model.js';
+import Order from '../orders/order.model.js';
+import Employee from '../employees/employee.model.js';
+
+const parseActiveFilter = (value) => {
+    if (value === undefined || value === null || value === '' || value === 'all') {
+        return undefined;
+    }
+
+    if (value === true || value === 'true' || value === 'active') {
+        return true;
+    }
+
+    if (value === false || value === 'false' || value === 'inactive') {
+        return false;
+    }
+
+    return undefined;
+};
 
 export const createClient = async (req, res) => {
     try {
@@ -45,10 +63,27 @@ export const getClients = async (req, res) => {
 
     try {
         const { page = 1, limit = 20, isActive, search = '' } = req.query;
-
+        const user = req.user;
         const filter = {};
-        if (isActive !== undefined) {
-            filter.isActive = isActive === 'true';
+
+        // Enforce MANAGER_ROLE restriction - Only see clients who have ordered at their restaurant
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            const orderClients = await Order.distinct('client', { restaurant: employee.restaurant });
+            filter._id = { $in: orderClients };
+        }
+
+        const normalizedIsActive = parseActiveFilter(isActive);
+        if (normalizedIsActive !== undefined) {
+            filter.isActive = normalizedIsActive;
+        } else if (isActive === undefined) {
+            filter.isActive = true;
         }
 
         if (search) {
@@ -94,6 +129,7 @@ export const getClients = async (req, res) => {
 export const getClientById = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
         const client = await Client.findById(id);
 
@@ -102,6 +138,24 @@ export const getClientById = async (req, res) => {
                 success: false,
                 message: 'Cliente no encontrado',
             });
+        }
+
+        // Enforce MANAGER_ROLE restriction
+        if (user.role === 'MANAGER_ROLE') {
+            const employee = await Employee.findOne({ userId: user.id });
+            if (!employee) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se encontró información de tu restaurante."
+                });
+            }
+            const hasOrder = await Order.exists({ client: id, restaurant: employee.restaurant });
+            if (!hasOrder) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Este cliente no tiene historial en tu restaurante."
+                });
+            }
         }
 
         res.status(200).json({

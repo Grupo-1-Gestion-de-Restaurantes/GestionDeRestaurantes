@@ -111,6 +111,10 @@ export const getEvents = async (req, res) => {
         const parsedLimit = parseInt(limit);
 
         const events = await Event.find(filter)
+            .populate('restaurant', 'name address')
+            .populate('assignedEmployees', 'fullName specialty')
+            .populate('specialDishes', 'name price')
+            .populate('assignedTables', 'tableNumber capacity')
             .limit(parsedLimit)
             .skip((parsedPage - 1) * parsedLimit)
             .sort({ createdAt: -1 });
@@ -141,7 +145,11 @@ export const getEventById = async (req, res) => {
     try {
         const eventId = req.params.id;
         const user = req.user;
-        const event = await Event.findById(eventId);
+        const event = await Event.findById(eventId)
+            .populate('restaurant', 'name address')
+            .populate('assignedEmployees', 'fullName specialty')
+            .populate('specialDishes', 'name price')
+            .populate('assignedTables', 'tableNumber capacity');
 
         if (!event) {
             return res.status(404).json({

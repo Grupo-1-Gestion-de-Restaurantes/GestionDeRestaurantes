@@ -119,12 +119,12 @@ export const validateGetComments = [
         .isString()
         .withMessage('La búsqueda debe ser texto'),
     query('restaurantId')
-        .optional()
+        .optional({ checkFalsy: true })
         .isMongoId()
         .withMessage('restaurantId debe ser un ObjectId válido'),
     query('isActive')
         .optional()
-        .isIn(['true', 'false'])
-        .withMessage('isActive debe ser true o false'),
+        .isIn(['true', 'false', 'all'])
+        .withMessage('isActive debe ser true o false o all'),
     checkValidators,
 ];
