@@ -12,8 +12,12 @@ import { notificationService } from '../notifications/notification.service.js';
 import Client from "../client/client.model.js";
 
 const parseActiveFilter = (value) => {
-    if (value === undefined || value === null || value === '' || value === 'all') {
+    if (value === undefined || value === null || value === '') {
         return undefined;
+    }
+
+    if (value === 'all') {
+        return 'all';
     }
 
     if (value === true || value === 'true' || value === 'active') {
@@ -726,7 +730,8 @@ export const getOrders = async (req, res) => {
         }
 
         const normalizedIsActive = parseActiveFilter(isActive);
-        if (normalizedIsActive !== undefined) {
+
+        if (normalizedIsActive !== undefined && normalizedIsActive !== 'all') {
             filter.isActive = normalizedIsActive;
         } else if (isActive === undefined) {
             filter.isActive = true;

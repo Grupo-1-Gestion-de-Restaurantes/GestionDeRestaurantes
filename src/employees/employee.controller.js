@@ -126,8 +126,12 @@ export const createEmployee = async (req, res) => {
 }
 
 const parseActiveFilter = (value) => {
-    if (value === undefined || value === null || value === '' || value === 'all') {
+    if (value === undefined || value === null || value === '') {
         return undefined;
+    }
+
+    if (value === 'all') {
+        return 'all';
     }
 
     if (value === true || value === 'true' || value === 'active') {
@@ -161,7 +165,7 @@ export const getEmployees = async (req, res) => {
         }
 
         const normalizedIsActive = parseActiveFilter(isActive);
-        if (normalizedIsActive !== undefined) {
+        if (normalizedIsActive !== undefined && normalizedIsActive !== 'all') {
             filter.isActive = normalizedIsActive;
         } else if (isActive === undefined) {
             filter.isActive = true;

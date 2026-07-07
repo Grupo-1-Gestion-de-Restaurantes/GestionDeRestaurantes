@@ -33,6 +33,14 @@ import { seedDishesIfEmpty } from '../src/seed/dishes.seed.js';
 import { seedTablesIfEmpty } from '../src/seed/tables.seed.js';
 import { seedPromotionsIfEmpty } from '../src/seed/promotions.seed.js';
 import { seedEventsIfEmpty } from '../src/seed/events.seed.js';
+import { seedInventoryIfEmpty } from '../src/seed/inventory.seed.js';
+import { seedClientsIfEmpty } from '../src/seed/clients.seed.js';
+import { seedReservationsIfEmpty } from '../src/seed/reservations.seed.js';
+import { seedOrdersIfEmpty } from '../src/seed/orders.seed.js';
+import { seedInvoicesIfEmpty } from '../src/seed/invoices.seed.js';
+import { seedCommentsIfEmpty } from '../src/seed/comments.seed.js';
+import { seedEmployeesIfEmpty } from '../src/seed/employees.seed.js';
+import { seedPartnersIfEmpty } from '../src/seed/partners.seed.js';
 import { runMassiveSeed } from '../massive-seed.js';
 
 const BASE_PATH = '/gestionDeRestaurantes/v1';
@@ -88,15 +96,33 @@ export const initServer = async () => {
 
     app.set('trust proxy', 1);
 
-    try {
+try {
         await dbConnection();
-        
-        // Seeders logic
+
+        // Seeders logic - Core entities first
         await seedRestaurantsIfEmpty();
-        await seedDishesIfEmpty();
+        await seedInventoryIfEmpty();
+        await seedClientsIfEmpty();
+        
+        // Dependent entities
         await seedTablesIfEmpty();
+        await seedDishesIfEmpty();
+        
+        // Transactional entities
+        await seedReservationsIfEmpty();
+        await seedOrdersIfEmpty();
+        
+        // Financial & Engagement entities
+        await seedInvoicesIfEmpty();
         await seedPromotionsIfEmpty();
         await seedEventsIfEmpty();
+        
+        // Social & Staff entities
+        await seedCommentsIfEmpty();
+        await seedEmployeesIfEmpty();
+        await seedPartnersIfEmpty();
+
+        // Staff & Partnerships (massive seed adds more data)
         await runMassiveSeed();
 
         middlewares(app);
