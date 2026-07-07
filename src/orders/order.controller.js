@@ -11,6 +11,10 @@ import Promotion from "../promotions/promotions.model.js";
 import { notificationService } from '../notifications/notification.service.js';
 import Client from "../client/client.model.js";
 
+// Evita arrastrar errores de coma flotante (ej. 0.1 * 3 = 0.30000000000000004)
+// hacia el inventario al descontar/restaurar cantidades con decimales.
+const roundQuantity = (value) => Math.round(value * 100) / 100;
+
 const parseActiveFilter = (value) => {
     if (value === undefined || value === null || value === '') {
         return undefined;
@@ -76,7 +80,7 @@ const restoreStockForOrder = async (order) => {
 
         for (const ingredient of dish.ingredients) {
             if (!ingredient.inventoryItem) continue;
-            const amountToRestore = ingredient.quantityUsed * item.quantity;
+            const amountToRestore = roundQuantity(ingredient.quantityUsed * item.quantity);
             restockOps.push({
                 updateOne: {
                     filter: { _id: ingredient.inventoryItem._id || ingredient.inventoryItem },
@@ -164,7 +168,7 @@ export const createOrder = async (req, res) => {
             let subtotal = dish.price * item.quantity;
 
             for (const ingredient of dish.ingredients) {
-                const totalNeeded = ingredient.quantityUsed * item.quantity;
+                const totalNeeded = roundQuantity(ingredient.quantityUsed * item.quantity);
                 
                 // --- Null Safety Check ---
                 if (!ingredient.inventoryItem) {
@@ -521,7 +525,7 @@ export const createOrderAdmin = async (req, res) => {
             }
 
             for (const ingredient of dish.ingredients) {
-                const totalNeeded = ingredient.quantityUsed * item.quantity;
+                const totalNeeded = roundQuantity(ingredient.quantityUsed * item.quantity);
 
                 if (!ingredient.inventoryItem) {
                     throw new Error(`El ingrediente para el plato "${dish.name}" ya no existe en el inventario.`);
@@ -711,7 +715,7 @@ export const updateOrderAdmin = async (req, res) => {
 
 export const getOrders = async (req, res) => {
     try {
-        const { page = 1, limit = 20, restaurante, isActive } = req.query;
+        const { page = 1, limit = 20, restaurant, isActive } = req.query;
         const user = req.user;
         const filter = {};
 
@@ -725,8 +729,8 @@ export const getOrders = async (req, res) => {
                 });
             }
             filter.restaurant = employee.restaurant;
-        } else if (restaurante) {
-            filter.restaurant = restaurante;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
         }
 
         const normalizedIsActive = parseActiveFilter(isActive);

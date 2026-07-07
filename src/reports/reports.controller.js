@@ -98,6 +98,11 @@ export const getGeneralReport = async (req, res) => {
             { $sort: { total: -1 } },
         ]);
 
+        // Partimos de los restaurantes (no de las órdenes) para que un restaurante sin
+        // pedidos ENTREGADO todavía aparezca en el reporte con su rating real.
+        const restaurantFilter = isIndividual ? { _id: new mongoose.Types.ObjectId(restaurantId) } : {};
+        const restaurantsList = await Restaurant.find(restaurantFilter).select('name rating capacity');
+
         const performance = await Order.aggregate([
             { $match: { status: 'ENTREGADO', ...filter } },
             {
@@ -107,24 +112,6 @@ export const getGeneralReport = async (req, res) => {
                     totalPedidos: { $sum: 1 },
                 },
             },
-            {
-                $lookup: {
-                    from: 'restaurantes', 
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'restInfo',
-                },
-            },
-            { $unwind: '$restInfo' },
-            {
-                $project: {
-                    name: '$restInfo.name',
-                    ingresos: 1,
-                    totalPedidos: 1,
-                    satisfaccion: '$restInfo.rating',
-                    capacidad: '$restInfo.capacity',
-                },
-            },
         ]);
 
         const occupancy = await Reservation.aggregate([
@@ -132,12 +119,18 @@ export const getGeneralReport = async (req, res) => {
             { $group: { _id: '$restaurant', totalPeople: { $sum: '$numberOfPeople' } } },
         ]);
 
-        const finalReport = performance.map((p) => {
-            const occ = occupancy.find((o) => o._id.toString() === p._id.toString());
+        const finalReport = restaurantsList.map((rest) => {
+            const perf = performance.find((p) => p._id.toString() === rest._id.toString());
+            const occ = occupancy.find((o) => o._id.toString() === rest._id.toString());
             return {
-                ...p,
-                ocupacionPromedio: occ
-                    ? ((occ.totalPeople / p.capacidad) * 100).toFixed(2) + '%'
+                _id: rest._id,
+                name: rest.name,
+                ingresos: perf?.ingresos || 0,
+                totalPedidos: perf?.totalPedidos || 0,
+                satisfaccion: rest.rating || 0,
+                capacidad: rest.capacity,
+                ocupacionPromedio: occ && rest.capacity
+                    ? ((occ.totalPeople / rest.capacity) * 100).toFixed(2) + '%'
                     : '0%',
             };
         });

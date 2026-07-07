@@ -148,7 +148,7 @@ const parseActiveFilter = (value) => {
 export const getEmployees = async (req, res) => {
     try {
 
-        const { page = 1, limit = 20, isActive } = req.query;
+        const { page = 1, limit = 20, isActive, restaurant } = req.query;
         const user = req.user;
         const filter = {};
 
@@ -162,6 +162,8 @@ export const getEmployees = async (req, res) => {
                 });
             }
             filter.restaurant = employee.restaurant;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
         }
 
         const normalizedIsActive = parseActiveFilter(isActive);
@@ -196,6 +198,32 @@ export const getEmployees = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener los empleados',
+            error: error.message
+        });
+    }
+}
+
+export const getMyEmployee = async (req, res) => {
+    try {
+        const user = req.user;
+        const employee = await Employee.findOne({ userId: user.id }).populate('restaurant', 'name');
+
+        if (!employee) {
+            return res.status(404).json({
+                success: false,
+                message: 'No se encontró información de empleado para este usuario.'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: employee
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener tu información de empleado',
             error: error.message
         });
     }

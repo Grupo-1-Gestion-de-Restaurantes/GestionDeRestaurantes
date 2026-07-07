@@ -30,16 +30,21 @@ export const createPartnerLead = async (req, res) => {
 
 export const getPartnerLeads = async (req, res) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, status } = req.query;
     const parsedPage = parseInt(page);
     const parsedLimit = parseInt(limit);
+    const filter = {};
 
-    const leads = await PartnerLead.find()
+    if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
+      filter.status = status;
+    }
+
+    const leads = await PartnerLead.find(filter)
       .limit(parsedLimit)
       .skip((parsedPage - 1) * parsedLimit)
       .sort({ createdAt: -1 });
 
-    const total = await PartnerLead.countDocuments();
+    const total = await PartnerLead.countDocuments(filter);
 
     res.status(200).json({
       success: true,

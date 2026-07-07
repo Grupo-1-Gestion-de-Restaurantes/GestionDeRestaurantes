@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { uploadMemory } from '../../middlewares/file-uploader.js';
-import { createEmployee, changeEmployeeStatus, getEmployeeById, getEmployees, updateEmployee } from './employee.controller.js';
+import { createEmployee, changeEmployeeStatus, getEmployeeById, getEmployees, getMyEmployee, updateEmployee } from './employee.controller.js';
 import {
     validateCreateEmployee,
     validateUpdateEmployee,
@@ -12,6 +12,8 @@ import { validateJWT } from '../../middlewares/validate-JWT.js';
 const router = Router();
 
 router.get('/', validateJWT, getEmployees);
+
+router.get('/me', validateJWT, getMyEmployee);
 
 router.get('/:id', validateGetEmployeeById, getEmployeeById);
 

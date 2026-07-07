@@ -59,7 +59,7 @@ export const createTable = async (req, res) => {
 
 export const getTables = async (req, res) => {
     try {
-        const { page = 1, limit = 20, isActive, restaurante } = req.query;
+        const { page = 1, limit = 20, isActive, restaurant } = req.query;
         const user = req.user;
         const filter = {};
 
@@ -73,8 +73,8 @@ export const getTables = async (req, res) => {
                 });
             }
             filter.restaurant = employee.restaurant;
-        } else if (restaurante) {
-            filter.restaurant = restaurante;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
         }
 
         const normalizedIsActive = parseActiveFilter(isActive);
