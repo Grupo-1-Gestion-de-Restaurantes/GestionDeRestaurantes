@@ -16,6 +16,7 @@ export const syncClient = async (req, res, next) => {
       {
         $setOnInsert: {
           _id: id,
+          id,
           email,
           name,
           phone,

@@ -10,6 +10,12 @@ const clientSchema = mongoose.Schema(
             trim: true,
         },
 
+        id: {
+            type: String,
+            unique: true,
+            trim: true,
+        },
+
         name: {
             type: String,
             trim: true
