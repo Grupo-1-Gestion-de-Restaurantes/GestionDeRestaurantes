@@ -2,6 +2,7 @@ import { body, param, query } from 'express-validator';
 import { checkValidators } from './checkValidators.js';
 import { validateJWT } from './validate-JWT.js';
 import { requireRole } from './validate-role.js';
+import { syncClient } from './syncClient.js';
 
 export const validateCreateComment = [
     validateJWT,
@@ -18,10 +19,14 @@ export const validateCreateComment = [
         .withMessage('El comentario no puede tener más de 500 caracteres'),
     body('restaurantId')
         .optional()
-        .trim(),
+        .trim()
+        .isMongoId()
+        .withMessage('restaurantId debe ser un ObjectId válido'),
     body('dishId')
         .optional()
-        .trim(),
+        .trim()
+        .isMongoId()
+        .withMessage('dishId debe ser un ObjectId válido'),
     body()
         .custom((value, { req }) => {
             const { restaurantId, dishId } = req.body;
@@ -100,6 +105,20 @@ export const validateGetCommentsRestaurant = [
     param('restaurantId')
         .isMongoId()
         .withMessage('restaurantId debe ser un ObjectId válido de MongoDB'),
+    checkValidators,
+];
+
+export const validateGetMyComments = [
+    validateJWT,
+    syncClient,
+    query('page')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('La página debe ser mayor a 0'),
+    query('limit')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('El límite debe ser mayor a 0'),
     checkValidators,
 ];
 

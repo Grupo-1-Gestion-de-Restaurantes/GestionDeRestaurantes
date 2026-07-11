@@ -53,11 +53,11 @@ export const validateUpdateClientRequest = [
         .matches(/^[0-9]{0,15}$/)
         .withMessage('Teléfono inválido (0-15 dígitos)'),
     body('birthdate')
-        .optional()
+        .optional({ nullable: true, checkFalsy: true })
         .isISO8601()
         .withMessage('Fecha inválida'),
     body('gender')
-        .optional()
+        .optional({ nullable: true, checkFalsy: true })
         .isIn(['Masculino', 'Femenino', 'Otro']),
     body('address')
         .optional()

@@ -1,12 +1,13 @@
 import { Router } from 'express';
-import { 
-    createComment, 
-    getComments, 
-    getCommentById, 
-    updateComment, 
+import {
+    createComment,
+    getComments,
+    getCommentById,
+    updateComment,
     changeCommentStatus,
     getCommentsDish,
-    getCommentsRestaurants
+    getCommentsRestaurants,
+    getMyComments
 } from './comment.controller.js';
 
 import {
@@ -16,7 +17,8 @@ import {
     validateGetCommentById,
     validateGetComments,
     validateGetCommentsDish,
-    validateGetCommentsRestaurant
+    validateGetCommentsRestaurant,
+    validateGetMyComments
 } from '../../middlewares/comment-validators.js';
 
 const router = Router();
@@ -28,7 +30,13 @@ router.get(
 );
 
 router.get(
-    '/:id', 
+    '/mine',
+    validateGetMyComments,
+    getMyComments
+);
+
+router.get(
+    '/:id',
     validateGetCommentById,
     getCommentById
 );
@@ -46,19 +54,19 @@ router.get(
 );
 
 router.post(
-    '/', 
+    '/',
     validateCreateComment,
     createComment
 );
 
 router.put(
-    '/:id', 
+    '/:id',
     validateUpdateCommentRequest,
     updateComment
 );
 
 router.put(
-    '/activate/:id', 
+    '/activate/:id',
     validateCommentStatusChange,
     changeCommentStatus
 );
