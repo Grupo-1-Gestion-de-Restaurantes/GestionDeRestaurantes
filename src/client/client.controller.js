@@ -293,9 +293,23 @@ export const addAddressToClient = async (req, res) => {
             });
         }
 
+        const newAddress = { ...req.body.address };
+        if (!client.addresses || client.addresses.length === 0) {
+            newAddress.isDefault = true;
+        } else if (newAddress.isDefault === undefined) {
+            newAddress.isDefault = false;
+        }
+
+        if (newAddress.isDefault) {
+            await Client.updateOne(
+                { _id: client._id },
+                { $set: { 'addresses.$[].isDefault': false } }
+            );
+        }
+
         const updatedClient = await Client.findByIdAndUpdate(
             client._id,
-            { $push: { addresses: req.body.address } },
+            { $push: { addresses: newAddress } },
             { new: true, runValidators: true }
         );
 
