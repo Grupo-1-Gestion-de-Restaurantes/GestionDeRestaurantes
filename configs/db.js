@@ -8,7 +8,7 @@ export const dbConnection = async () =>{
             console.log('MongoDB | no se pudo conectar a mongoDB');
             mongoose.disconnect();
         });
-        mongoose.connection.on('conecting', () =>{
+        mongoose.connection.on('connecting', () =>{
             console.log('MongoDB | intentando conectar a mongoDB');
         });
         mongoose.connection.on('connected', () =>{
