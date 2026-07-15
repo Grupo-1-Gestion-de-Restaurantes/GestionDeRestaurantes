@@ -3,8 +3,12 @@ import Restaurant from '../restaurants/restaurant.model.js';
 import Employee from '../employees/employee.model.js';
 
 const parseActiveFilter = (value) => {
-    if (value === undefined || value === null || value === '' || value === 'all') {
+    if (value === undefined || value === null || value === '') {
         return undefined;
+    }
+
+    if (value === 'all') {
+        return 'all';
     }
 
     if (value === true || value === 'true' || value === 'active') {
@@ -55,7 +59,7 @@ export const createTable = async (req, res) => {
 
 export const getTables = async (req, res) => {
     try {
-        const { page = 1, limit = 20, isActive, restaurante } = req.query;
+        const { page = 1, limit = 20, isActive, restaurant } = req.query;
         const user = req.user;
         const filter = {};
 
@@ -69,15 +73,15 @@ export const getTables = async (req, res) => {
                 });
             }
             filter.restaurant = employee.restaurant;
-        } else if (restaurante) {
-            filter.restaurant = restaurante;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
         }
 
         const normalizedIsActive = parseActiveFilter(isActive);
 
-        if (normalizedIsActive !== undefined) {
+        if (normalizedIsActive !== undefined && normalizedIsActive !== 'all') {
             filter.isActive = normalizedIsActive;
-        } else if (isActive === undefined) {
+        } else if (normalizedIsActive !== 'all') {
             filter.isActive = true;
         }
         
@@ -315,7 +319,7 @@ export const getTablesByRestaurant = async (req, res) => {
         const filter = { restaurant: restaurantId };
         const normalizedIsActive = parseActiveFilter(isActive);
 
-        if (normalizedIsActive !== undefined) {
+        if (normalizedIsActive !== undefined && normalizedIsActive !== 'all') {
             filter.isActive = normalizedIsActive;
         }
         

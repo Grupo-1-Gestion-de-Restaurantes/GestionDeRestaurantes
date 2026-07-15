@@ -126,8 +126,12 @@ export const createEmployee = async (req, res) => {
 }
 
 const parseActiveFilter = (value) => {
-    if (value === undefined || value === null || value === '' || value === 'all') {
+    if (value === undefined || value === null || value === '') {
         return undefined;
+    }
+
+    if (value === 'all') {
+        return 'all';
     }
 
     if (value === true || value === 'true' || value === 'active') {
@@ -144,7 +148,7 @@ const parseActiveFilter = (value) => {
 export const getEmployees = async (req, res) => {
     try {
 
-        const { page = 1, limit = 20, isActive } = req.query;
+        const { page = 1, limit = 20, isActive, restaurant } = req.query;
         const user = req.user;
         const filter = {};
 
@@ -158,10 +162,12 @@ export const getEmployees = async (req, res) => {
                 });
             }
             filter.restaurant = employee.restaurant;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
         }
 
         const normalizedIsActive = parseActiveFilter(isActive);
-        if (normalizedIsActive !== undefined) {
+        if (normalizedIsActive !== undefined && normalizedIsActive !== 'all') {
             filter.isActive = normalizedIsActive;
         } else if (isActive === undefined) {
             filter.isActive = true;
@@ -192,6 +198,32 @@ export const getEmployees = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener los empleados',
+            error: error.message
+        });
+    }
+}
+
+export const getMyEmployee = async (req, res) => {
+    try {
+        const user = req.user;
+        const employee = await Employee.findOne({ userId: user.id }).populate('restaurant', 'name');
+
+        if (!employee) {
+            return res.status(404).json({
+                success: false,
+                message: 'No se encontró información de empleado para este usuario.'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: employee
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener tu información de empleado',
             error: error.message
         });
     }

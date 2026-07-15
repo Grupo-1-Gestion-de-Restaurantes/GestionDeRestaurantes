@@ -169,8 +169,7 @@ export const validateUpdateEventRequest = [
 // Validaciones para activar/desactivar eventos
 export const validateRestaurantStatusChange = [
     validateJWT,
-    requireRole('ADMIN_ROLE'),
-    requireRole('MANAGER_ROLE'),
+    requireRole('ADMIN_ROLE', 'MANAGER_ROLE'),
     param('id')
         .isMongoId()
         .withMessage('ID debe ser un ObjectId válido de MongoDB'),

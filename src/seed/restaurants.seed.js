@@ -27,7 +27,7 @@ export const seedRestaurantsIfEmpty = async () => {
         description: `Bienvenido a ${p.name}, donde servimos lo mejor de nuestra especialidad.`,
         averagePrice: p.categories === "Gourmet" ? 25 : 12,
         capacity: 50,
-        rating: 4.5 + Math.random() * 0.5,
+        rating: Math.round((4.5 + Math.random() * 0.5) * 10) / 10,
         etaMin: 15 + Math.floor(Math.random() * 30)
       })));
       console.log('Restaurants seeded successfully.');

@@ -1,0 +1,47 @@
+# --- Dependencias instaladas en el host ---
+# Se reinstalan dentro de la imagen con pnpm (lockfile del proyecto).
+node_modules
+**/node_modules
+
+# --- Control de versiones y docs ---
+.git
+.gitignore
+README.md
+**/*.md
+
+# --- Entorno local (Compose inyectará variables al contenedor) ---
+.env
+.env.*
+!.env.example
+
+# --- Logs y temporales ---
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+tmp/
+temp/
+.cache/
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Docker (meta; no aportan al build del servicio) ---
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# --- Tests / coverage (cuando existan) ---
+coverage/
+.nyc_output/
+**/__tests__/
+**/*.test.js
+**/*.spec.js
+
+# --- Sistema operativo ---
+Thumbs.db
+Desktop.ini
+.DS_Store

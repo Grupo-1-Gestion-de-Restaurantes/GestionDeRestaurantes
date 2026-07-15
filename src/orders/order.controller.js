@@ -11,9 +11,17 @@ import Promotion from "../promotions/promotions.model.js";
 import { notificationService } from '../notifications/notification.service.js';
 import Client from "../client/client.model.js";
 
+// Evita arrastrar errores de coma flotante (ej. 0.1 * 3 = 0.30000000000000004)
+// hacia el inventario al descontar/restaurar cantidades con decimales.
+const roundQuantity = (value) => Math.round(value * 100) / 100;
+
 const parseActiveFilter = (value) => {
-    if (value === undefined || value === null || value === '' || value === 'all') {
+    if (value === undefined || value === null || value === '') {
         return undefined;
+    }
+
+    if (value === 'all') {
+        return 'all';
     }
 
     if (value === true || value === 'true' || value === 'active') {
@@ -53,6 +61,38 @@ const ORDER_NOTIFICATION_MAP = {
         title: 'Pedido cancelado',
         message: 'Tu pedido ha sido cancelado.',
     },
+};
+
+/**
+ * Restaura al inventario el stock descontado al crear un pedido (usado al cancelarlo).
+ * Recalcula las cantidades a partir de la receta ACTUAL del platillo, ya que la orden
+ * solo guarda una referencia al platillo, no un snapshot de sus ingredientes.
+ */
+const restoreStockForOrder = async (order) => {
+    const dishIds = order.items.map(i => i.productId);
+    const dishes = await Dish.find({ _id: { $in: dishIds } }).populate('ingredients.inventoryItem');
+    const dishMap = new Map(dishes.map(d => [d._id.toString(), d]));
+
+    const restockOps = [];
+    for (const item of order.items) {
+        const dish = dishMap.get(item.productId?.toString());
+        if (!dish) continue;
+
+        for (const ingredient of dish.ingredients) {
+            if (!ingredient.inventoryItem) continue;
+            const amountToRestore = roundQuantity(ingredient.quantityUsed * item.quantity);
+            restockOps.push({
+                updateOne: {
+                    filter: { _id: ingredient.inventoryItem._id || ingredient.inventoryItem },
+                    update: { $inc: { quantity: amountToRestore } }
+                }
+            });
+        }
+    }
+
+    if (restockOps.length > 0) {
+        await InventoryItem.bulkWrite(restockOps);
+    }
 };
 
 /**
@@ -128,7 +168,7 @@ export const createOrder = async (req, res) => {
             let subtotal = dish.price * item.quantity;
 
             for (const ingredient of dish.ingredients) {
-                const totalNeeded = ingredient.quantityUsed * item.quantity;
+                const totalNeeded = roundQuantity(ingredient.quantityUsed * item.quantity);
                 
                 // --- Null Safety Check ---
                 if (!ingredient.inventoryItem) {
@@ -393,6 +433,10 @@ export const updateOrderStatus = async (req, res) => {
                     });
                 }
             }
+
+            if (order.status !== 'CANCELADO') {
+                await restoreStockForOrder(order);
+            }
         }
 
         const updatedOrder = await Order.findByIdAndUpdate(
@@ -467,16 +511,36 @@ export const createOrderAdmin = async (req, res) => {
         }
 
         let totalOrder = 0;
+        const stockDeductions = [];
 
         const hydratedItems = await Promise.all(items.map(async (item) => {
             const dish = await Dish.findOne({
                 _id: item.dishId,
                 restaurant: restaurantId,
                 isActive: true
-            });
+            }).populate('ingredients.inventoryItem');
 
             if (!dish) {
                 throw new Error(`El plato con ID ${item.dishId} no está disponible en este restaurante`);
+            }
+
+            for (const ingredient of dish.ingredients) {
+                const totalNeeded = roundQuantity(ingredient.quantityUsed * item.quantity);
+
+                if (!ingredient.inventoryItem) {
+                    throw new Error(`El ingrediente para el plato "${dish.name}" ya no existe en el inventario.`);
+                }
+
+                const currentStock = ingredient.inventoryItem.quantity || 0;
+
+                if (currentStock < totalNeeded) {
+                    throw new Error(`No hay suficiente stock de "${ingredient.inventoryItem.name}" para preparar ${item.quantity} unidades de ${dish.name}`);
+                }
+
+                stockDeductions.push({
+                    inventoryItemId: ingredient.inventoryItem._id,
+                    amountToDeduct: totalNeeded
+                });
             }
 
             const subtotal = dish.price * item.quantity;
@@ -490,6 +554,16 @@ export const createOrderAdmin = async (req, res) => {
                 subtotal: subtotal
             };
         }));
+
+        if (stockDeductions.length > 0) {
+            const bulkOps = stockDeductions.map(d => ({
+                updateOne: {
+                    filter: { _id: d.inventoryItemId },
+                    update: { $inc: { quantity: -d.amountToDeduct } }
+                }
+            }));
+            await InventoryItem.bulkWrite(bulkOps);
+        }
 
         const newOrder = new Order({
             client: clientId,
@@ -538,9 +612,16 @@ export const createOrderAdmin = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({
+        console.error("Error en createOrderAdmin:", error);
+
+        const statusCode = error.message.includes("stock") ||
+                           error.message.includes("disponible") ||
+                           error.message.includes("inventario")
+                           ? 400 : 500;
+
+        res.status(statusCode).json({
             success: false,
-            message: "Error al procesar la orden administrativa",
+            message: error.message || "Error al procesar la orden administrativa",
             error: error.message
         });
     }
@@ -634,7 +715,7 @@ export const updateOrderAdmin = async (req, res) => {
 
 export const getOrders = async (req, res) => {
     try {
-        const { page = 1, limit = 20, restaurante, isActive } = req.query;
+        const { page = 1, limit = 20, restaurant, isActive } = req.query;
         const user = req.user;
         const filter = {};
 
@@ -648,12 +729,13 @@ export const getOrders = async (req, res) => {
                 });
             }
             filter.restaurant = employee.restaurant;
-        } else if (restaurante) {
-            filter.restaurant = restaurante;
+        } else if (restaurant) {
+            filter.restaurant = restaurant;
         }
 
         const normalizedIsActive = parseActiveFilter(isActive);
-        if (normalizedIsActive !== undefined) {
+
+        if (normalizedIsActive !== undefined && normalizedIsActive !== 'all') {
             filter.isActive = normalizedIsActive;
         } else if (isActive === undefined) {
             filter.isActive = true;
@@ -709,6 +791,10 @@ export const deleteOrder = async (req, res) => {
                     message: "No tienes permiso para eliminar pedidos de este restaurante"
                 });
             }
+        }
+
+        if (order.status !== 'CANCELADO') {
+            await restoreStockForOrder(order);
         }
 
         const updatedOrder = await Order.findByIdAndUpdate(

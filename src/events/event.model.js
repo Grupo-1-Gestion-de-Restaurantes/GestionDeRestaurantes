@@ -61,6 +61,12 @@ const eventSchema = new mongoose.Schema({
             message: 'Los servicios adicionales deben ser uno de los siguientes: MUSICA_EN_VIVO, DECORACION_ESPECIAL, FOTOGRAFIA, OTRO'
         }
     }],
+    otherServiceDescription: {
+        type: String,
+        trim: true,
+        maxlength: [100, 'La descripción del otro servicio no puede tener más de 100 caracteres'],
+        default: ""
+    },
     activePromotions: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Promotion'

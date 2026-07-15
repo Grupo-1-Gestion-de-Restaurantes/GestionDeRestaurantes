@@ -1,6 +1,7 @@
 import Comment from "./comment.model.js";
 import Restaurante from "../restaurants/restaurant.model.js";
 import Employee from "../employees/employee.model.js";
+import Order from "../orders/order.model.js";
 
 const parseActiveFilter = (value) => {
     if (value === undefined || value === null || value === '' || value === 'all') {
@@ -20,10 +21,11 @@ const parseActiveFilter = (value) => {
 
 export const createComment = async (req, res) => {
     try {
-        const commentData = req.body;
+        const commentData = { ...req.body };
         const user = req.user;
 
-        // Enforce MANAGER_ROLE restriction
+
+
         if (user.role === 'MANAGER_ROLE' && commentData.restaurantId) {
             const employee = await Employee.findOne({ userId: user.id });
             if (!employee || employee.restaurant.toString() !== commentData.restaurantId.toString()) {
@@ -32,6 +34,10 @@ export const createComment = async (req, res) => {
                     message: "No puedes crear comentarios para otros restaurantes."
                 });
             }
+        }
+
+        if ((user.role === 'CLIENT_ROLE' || user.role === 'USER_ROLE')) {
+            commentData.clientId = user.id || user._id;
         }
 
         const comment = new Comment(commentData);
@@ -136,6 +142,44 @@ export const getComments = async (req, res) => {
     }
 };
 
+export const getMyComments = async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+        const client = req.user;
+
+        const filter = { clientId: client.id || client._id, isActive: true };
+
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+
+        const comments = await Comment.find(filter)
+            .populate({ path: 'restaurantId', model: 'Restaurante', select: 'name photo' })
+            .populate({ path: 'dishId', model: 'Dish', select: 'name photo' })
+            .limit(parsedLimit)
+            .skip((parsedPage - 1) * parsedLimit)
+            .sort({ createdAt: -1 });
+
+        const total = await Comment.countDocuments(filter);
+
+        res.status(200).json({
+            success: true,
+            data: comments,
+            pagination: {
+                currentPage: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
+                totalRecords: total,
+                limit: parsedLimit
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener tus reseñas',
+            error: error.message
+        });
+    }
+};
+
 export const getCommentById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -201,18 +245,6 @@ export const getCommentsDish = async (req, res) => {
 export const getCommentsRestaurants = async (req, res) => {
     try {
         const { restaurantId } = req.params;
-        const user = req.user;
-
-        // Enforce MANAGER_ROLE restriction
-        if (user.role === 'MANAGER_ROLE') {
-            const manager = await Employee.findOne({ userId: user.id });
-            if (!manager || manager.restaurant.toString() !== restaurantId.toString()) {
-                return res.status(403).json({
-                    success: false,
-                    message: "No tienes permiso para ver comentarios de otros restaurantes."
-                });
-            }
-        }
 
         const comments = await Comment.find({
             restaurantId,
@@ -284,7 +316,7 @@ export const changeCommentStatus = async (req, res) => {
         const { id } = req.params;
         const user = req.user;
         // Detectar si es activate o deactivate desde la URL
-        const isActive = req.url.includes('/activate');
+        const isActive = req.url.includes('/activate') && !req.url.includes('/deactivate');
         const action = isActive ? 'activado' : 'desactivado';
 
         const commentToUpdate = await Comment.findById(id);
@@ -311,6 +343,21 @@ export const changeCommentStatus = async (req, res) => {
             { isActive },
             { new: true }
         );
+
+        if (commentToUpdate.restaurantId) {
+            const restaurantComments = await Comment.find({
+                restaurantId: commentToUpdate.restaurantId,
+                isActive: true
+            });
+
+            const averageRating = restaurantComments.length > 0
+                ? restaurantComments.reduce((acc, curr) => acc + curr.review, 0) / restaurantComments.length
+                : 5.0;
+
+            await Restaurante.findByIdAndUpdate(commentToUpdate.restaurantId, {
+                rating: Math.round(averageRating * 10) / 10
+            });
+        }
 
         res.status(200).json({
             success: true,

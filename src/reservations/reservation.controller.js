@@ -265,6 +265,12 @@ export const updateReservation = async (req, res) => {
             runValidators: true,
         });
 
+        if (updateData.status === 'CONFIRMADA') {
+            await Table.findByIdAndUpdate(updatedReservation.table, { tableAvailability: false });
+        } else if (['CANCELADA', 'COMPLETADA', 'NO_ASISTIO'].includes(updateData.status)) {
+            await Table.findByIdAndUpdate(updatedReservation.table, { tableAvailability: true });
+        }
+
         const notifMap = {
             CONFIRMADA: { type: 'RESERVACION_CONFIRMADA', title: 'Reservación confirmada', message: 'Tu reservación ha sido confirmada. ¡Te esperamos!' },
             CANCELADA: { type: 'RESERVACION_CANCELADA', title: 'Reservación cancelada', message: 'Tu reservación ha sido cancelada.' },
