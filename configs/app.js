@@ -90,43 +90,60 @@ const routes = (app) => {
     app.use(errorHandler);
 };
 
-export const initServer = async () => {
-    const app = express();
-    const PORT = process.env.PORT;
+const runSeeders = async () => {
+    // Seeders logic - Core entities first
+    await seedRestaurantsIfEmpty();
+    await seedInventoryIfEmpty();
+    await seedClientsIfEmpty();
 
+    // Dependent entities
+    await seedTablesIfEmpty();
+    await seedDishesIfEmpty();
+
+    // Transactional entities
+    await seedReservationsIfEmpty();
+    await seedOrdersIfEmpty();
+
+    // Financial & Engagement entities
+    await seedInvoicesIfEmpty();
+    await seedPromotionsIfEmpty();
+    await seedEventsIfEmpty();
+
+    // Social & Staff entities
+    await seedCommentsIfEmpty();
+    await seedEmployeesIfEmpty();
+    await seedPartnersIfEmpty();
+
+    // Staff & Partnerships (massive seed adds more data)
+    await runMassiveSeed();
+};
+
+/**
+ * Crea y configura la app Express (sin listen).
+ * Usado por Vercel (serverless) y por initServer en local.
+ */
+export const createApp = async ({ runSeeds = false } = {}) => {
+    const app = express();
     app.set('trust proxy', 1);
 
-try {
-        await dbConnection();
+    await dbConnection();
 
-        // Seeders logic - Core entities first
-        await seedRestaurantsIfEmpty();
-        await seedInventoryIfEmpty();
-        await seedClientsIfEmpty();
-        
-        // Dependent entities
-        await seedTablesIfEmpty();
-        await seedDishesIfEmpty();
-        
-        // Transactional entities
-        await seedReservationsIfEmpty();
-        await seedOrdersIfEmpty();
-        
-        // Financial & Engagement entities
-        await seedInvoicesIfEmpty();
-        await seedPromotionsIfEmpty();
-        await seedEventsIfEmpty();
-        
-        // Social & Staff entities
-        await seedCommentsIfEmpty();
-        await seedEmployeesIfEmpty();
-        await seedPartnersIfEmpty();
+    // En Vercel los seeders se omiten para evitar timeouts en cold start
+    if (runSeeds && process.env.VERCEL !== '1') {
+        await runSeeders();
+    }
 
-        // Staff & Partnerships (massive seed adds more data)
-        await runMassiveSeed();
+    middlewares(app);
+    routes(app);
 
-        middlewares(app);
-        routes(app);
+    return app;
+};
+
+export const initServer = async () => {
+    const PORT = process.env.PORT;
+
+    try {
+        const app = await createApp({ runSeeds: true });
 
         const httpServer = createServer(app);
         initializeSocket(httpServer);
@@ -135,7 +152,6 @@ try {
             console.log(`Gestion Restaurantes server running on port ${PORT}`);
             console.log(`Health check: http://localhost:${PORT}${BASE_PATH}/health`);
         });
-
     } catch (error) {
         console.error(`Error starting Server: ${error.message}`);
         process.exit(1);
