@@ -25,8 +25,37 @@ URI_MONGO=mongodb://localhost:27017/DBGestionRestaurantes
 JWT_SECRET=tu_secreto_jwt_compartido_aqui
 JWT_ISSUER=AuthServiceGestionRestaurantes
 JWT_AUDIENCE=GestionRestaurantesMicroservices
+
+# Cloudinary (imágenes de restaurantes, platillos, promociones)
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+
+# Correos con Resend (mismo proveedor que AuthService — NO uses SMTP en Vercel)
+RESEND_API_KEY=re_xxxxxxxx
+RESEND_FROM_EMAIL=Express <noreply@expressgestorrestaurante.me>
+EMAIL_FROM_NAME=Express
+RESEND_ENABLED=true
+ADMIN_EMAIL=tu-admin@dominio.com
+FRONTEND_USER_URL=https://clientusergestionrestaurantes.web.app
+FRONTEND_ADMIN_URL=https://client-gestionderestaurantes.web.app
+
+AUTH_SERVICE_URL=https://tu-auth-service.up.railway.app
 ```
-*(Nota: Añade las credenciales de Cloudinary u otros servicios externos que estés utilizando para el manejo de imágenes).*
+
+### Correos con Resend
+
+Este API envía facturas, estados de partners, inscripciones a eventos y alertas admin mediante la [API de Resend](https://resend.com) (HTTPS), no SMTP/Gmail. Así funciona de forma fiable en **Vercel** y otros PaaS.
+
+| Variable | Descripción |
+| --- | --- |
+| `RESEND_API_KEY` | API key de Resend (misma cuenta que AuthService si lo deseas) |
+| `RESEND_FROM_EMAIL` | Remitente, p. ej. `Express <noreply@tudominio.com>` (dominio verificado en Resend) |
+| `RESEND_ENABLED` | `true` / `false` para activar o silenciar envíos |
+| `ADMIN_EMAIL` | Destino de alertas internas del sistema |
+| `FRONTEND_USER_URL` / `FRONTEND_ADMIN_URL` | Links de los botones CTA en los correos HTML |
+
+En **Vercel**, configura estas variables en el dashboard del proyecto (el runtime serverless no usa tu `.env` local). Sin dominio verificado, puedes usar `onboarding@resend.dev` solo para pruebas.
 
 ## Características Principales
 
